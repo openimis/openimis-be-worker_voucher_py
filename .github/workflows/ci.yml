@@ -17,14 +17,13 @@ on:
 jobs:
   call:
     name: Default CI Flow
-    uses: openimis/openimis-be_py/.github/workflows/ci_module.yml@develop
+    uses: openimis/openimis-be_py/.github/workflows/ci_module.yml@moldova
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     with:
-      SONAR_PROJECT_KEY: openimis_openimis-be-tasks_management_py
+      SONAR_PROJECT_KEY: openimis_openimis-be-worker_voucher_py
       SONAR_ORGANIZATION: openimis-1
-      SONAR_PROJECT_NAME: openimis-be-tasks_management_py
+      SONAR_PROJECT_NAME: openimis-be-worker_voucher_py
       SONAR_PROJECT_VERSION: 1.0
-      SONAR_SOURCES: tasks_management
+      SONAR_SOURCES: worker_voucher
       SONAR_EXCLUSIONS: "**/migrations/**,**/static/**,**/media/**,**/tests/**"
-
