@@ -20,7 +20,7 @@ class Query(graphene.ObjectType):
     )
 
     def resolve_worker_voucher(self, info, **kwargs):
-        self._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_search_perms)
+        Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_search_perms)
         filters = append_validity_filter(**kwargs)
 
         client_mutation_id = kwargs.get("client_mutation_id", None)
