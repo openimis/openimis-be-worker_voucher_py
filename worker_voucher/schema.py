@@ -8,6 +8,8 @@ from core.schema import OrderedDjangoFilterConnectionField
 from core.utils import append_validity_filter
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.gql_queries import WorkerVoucherGQLType
+from worker_voucher.gql_mutations import CreateWorkerVoucherMutation, UpdateWorkerVoucherMutation, \
+    DeleteWorkerVoucherMutation
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import get_voucher_worker_enquire_filters
 
@@ -52,3 +54,9 @@ class Query(graphene.ObjectType):
     def _check_permissions(user, perms):
         if type(user) is AnonymousUser or not user.id or not user.has_perms(perms):
             raise PermissionError(_("Unauthorized"))
+
+
+class Mutation(graphene.ObjectType):
+    createWorkerVoucher = CreateWorkerVoucherMutation.Field()
+    updateWorkerVoucher = UpdateWorkerVoucherMutation.Field()
+    deleteWorkerVoucher = DeleteWorkerVoucherMutation.Field()
