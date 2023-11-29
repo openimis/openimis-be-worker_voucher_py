@@ -1,7 +1,7 @@
 from django.db import migrations
 
-rights = ['204001']
-roles = ['Employer', 'Inspector', 'IMIS Administrator']
+rights = ['204002', '204003', '204004', '204005']
+roles = ['Inspector', 'IMIS Administrator']
 
 
 def add_rights(role_name, role_model, role_right_model):
@@ -38,7 +38,7 @@ def on_reverse_migration(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('worker_voucher', '0001_initial'),
+        ('worker_voucher', '0002_voucher_rights'),
     ]
 
     operations = [

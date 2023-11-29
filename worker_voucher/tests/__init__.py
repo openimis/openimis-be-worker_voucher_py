@@ -1,0 +1,2 @@
+from worker_voucher.tests.test_worker_enquire import WorkerEnquireTestCase
+from worker_voucher.tests.test_voucher_user_filter import VoucherUserTestCase
