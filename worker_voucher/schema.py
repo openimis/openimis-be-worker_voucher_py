@@ -1,11 +1,14 @@
 import graphene
 import graphene_django_optimizer as gql_optimizer
 
-from django.utils.translation import gettext as _
 from django.db.models import Q
+from django.utils.translation import gettext as _
 from django.contrib.auth.models import AnonymousUser
 from core.schema import OrderedDjangoFilterConnectionField
 from core.utils import append_validity_filter
+from insuree.apps import InsureeConfig
+from insuree.gql_queries import InsureeGQLType
+from insuree.models import Insuree
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.gql_queries import WorkerVoucherGQLType
 from worker_voucher.gql_mutations import CreateWorkerVoucherMutation, UpdateWorkerVoucherMutation, \
@@ -23,6 +26,12 @@ class Query(graphene.ObjectType):
         client_mutation_id=graphene.String(),
     )
 
+    previous_workers = OrderedDjangoFilterConnectionField(
+        InsureeGQLType,
+        orderBy=graphene.List(of_type=graphene.String),
+        economic_unit_code=graphene.String(required=True)
+    )
+
     enquire_worker = OrderedDjangoFilterConnectionField(
         WorkerVoucherGQLType,
         national_id=graphene.String(),
@@ -36,6 +45,18 @@ class Query(graphene.ObjectType):
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
         query = WorkerVoucher.objects.filter(*filters)
+        return gql_optimizer.query(query, info)
+
+    def resolve_previous_workers(self, info, economic_unit_code=None, **kwargs):
+        Query._check_permissions(info.context.user, InsureeConfig.gql_query_insuree_perms)
+        filters = append_validity_filter(**kwargs)
+
+        query = Insuree.get_queryset(None, info.context.user).filter(
+            validity_to__isnull=True,
+            workervoucher__is_deleted=False,
+            workervoucher__policyholder__is_deleted=False,
+            workervoucher__policyholder__code=economic_unit_code
+        )
         return gql_optimizer.query(query, info)
 
     def resolve_enquire_worker(self, info, national_id=None, **kwargs):
@@ -60,4 +81,3 @@ class Mutation(graphene.ObjectType):
     createWorkerVoucher = CreateWorkerVoucherMutation.Field()
     updateWorkerVoucher = UpdateWorkerVoucherMutation.Field()
     deleteWorkerVoucher = DeleteWorkerVoucherMutation.Field()
-
