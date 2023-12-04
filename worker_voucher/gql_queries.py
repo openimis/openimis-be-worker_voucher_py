@@ -9,6 +9,7 @@ from worker_voucher.models import WorkerVoucher
 
 class WorkerVoucherGQLType(DjangoObjectType):
     uuid = graphene.String(source='uuid')
+    date_updated_as_date = graphene.String()
 
     class Meta:
         model = WorkerVoucher
@@ -30,3 +31,6 @@ class WorkerVoucherGQLType(DjangoObjectType):
             "version": ["exact"],
         }
         connection_class = ExtendedConnection
+
+    def resolve_date_updated_as_date(self, info, **kwargs):
+        return self.date_updated.to_ad_date()
