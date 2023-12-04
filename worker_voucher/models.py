@@ -1,10 +1,11 @@
 from django.db import models
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-
 from core.models import HistoryModel
 from core import fields
 from insuree.models import Insuree
 from policyholder.models import PolicyHolder
+from graphql import ResolveInfo
 
 
 class WorkerVoucher(HistoryModel):
@@ -22,3 +23,16 @@ class WorkerVoucher(HistoryModel):
     status = models.CharField(max_length=255, blank=True, null=True, choices=Status.choices, default=Status.PENDING)
     assigned_date = fields.DateField(blank=True, null=True)
     expiry_date = fields.DateField(blank=True, null=True)
+
+    @classmethod
+    def get_queryset(cls, queryset, user):
+        from worker_voucher.services import get_voucher_user_filters
+
+        queryset = cls.filter_queryset(queryset)
+        if isinstance(user, ResolveInfo):
+            user = user.context.user
+        if settings.ROW_SECURITY:
+            if user.is_anonymous:
+                queryset = queryset.filter(id=None)
+            queryset = queryset.filter(*get_voucher_user_filters(user))
+        return queryset

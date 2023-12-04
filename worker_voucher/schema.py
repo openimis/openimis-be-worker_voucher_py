@@ -11,7 +11,10 @@ from insuree.gql_queries import InsureeGQLType
 from insuree.models import Insuree
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.gql_queries import WorkerVoucherGQLType
+from worker_voucher.gql_mutations import CreateWorkerVoucherMutation, UpdateWorkerVoucherMutation, \
+    DeleteWorkerVoucherMutation
 from worker_voucher.models import WorkerVoucher
+from worker_voucher.services import get_voucher_worker_enquire_filters
 
 
 class Query(graphene.ObjectType):
@@ -29,11 +32,15 @@ class Query(graphene.ObjectType):
         economic_unit_code=graphene.String(required=True)
     )
 
-    def resolve_worker_voucher(self, info, **kwargs):
+    enquire_worker = OrderedDjangoFilterConnectionField(
+        WorkerVoucherGQLType,
+        national_id=graphene.String(),
+    )
+
+    def resolve_worker_voucher(self, info, client_mutation_id=None, **kwargs):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_search_perms)
         filters = append_validity_filter(**kwargs)
 
-        client_mutation_id = kwargs.get("client_mutation_id", None)
         if client_mutation_id:
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
@@ -50,10 +57,27 @@ class Query(graphene.ObjectType):
             workervoucher__policyholder__is_deleted=False,
             workervoucher__policyholder__code=economic_unit_code
         )
+        return gql_optimizer.query(query, info)
 
+    def resolve_enquire_worker(self, info, national_id=None, **kwargs):
+        Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_search_perms)
+        filters = append_validity_filter(**kwargs)
+
+        if not national_id:
+            raise AttributeError(_("National ID required"))
+
+        filters.append(*get_voucher_worker_enquire_filters(national_id))
+
+        query = WorkerVoucher.objects.filter(*filters)
         return gql_optimizer.query(query, info)
 
     @staticmethod
     def _check_permissions(user, perms):
         if type(user) is AnonymousUser or not user.id or not user.has_perms(perms):
             raise PermissionError(_("Unauthorized"))
+
+
+class Mutation(graphene.ObjectType):
+    createWorkerVoucher = CreateWorkerVoucherMutation.Field()
+    updateWorkerVoucher = UpdateWorkerVoucherMutation.Field()
+    deleteWorkerVoucher = DeleteWorkerVoucherMutation.Field()
