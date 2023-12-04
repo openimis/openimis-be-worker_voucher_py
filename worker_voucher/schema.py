@@ -45,6 +45,7 @@ class Query(graphene.ObjectType):
         filters = append_validity_filter(**kwargs)
 
         query = Insuree.get_queryset(None, info.context.user).filter(
+            validity_to__isnull=True,
             workervoucher__is_deleted=False,
             workervoucher__policyholder__is_deleted=False,
             workervoucher__policyholder__code=economic_unit_code
