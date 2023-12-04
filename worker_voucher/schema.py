@@ -60,3 +60,4 @@ class Mutation(graphene.ObjectType):
     createWorkerVoucher = CreateWorkerVoucherMutation.Field()
     updateWorkerVoucher = UpdateWorkerVoucherMutation.Field()
     deleteWorkerVoucher = DeleteWorkerVoucherMutation.Field()
+
