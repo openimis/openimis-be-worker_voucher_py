@@ -10,7 +10,7 @@ from graphql import ResolveInfo
 
 class WorkerVoucher(HistoryModel):
     class Status(models.TextChoices):
-        PENDING = 'AWAITING_PAYMENT', _('Awaiting Payment')
+        AWAITING_PAYMENT = 'AWAITING_PAYMENT', _('Awaiting Payment')
         UNASSIGNED = 'UNASSIGNED', _('Unassigned')
         ASSIGNED = 'ASSIGNED', _('Assigned')
         EXPIRED = 'EXPIRED', _('Expired')
@@ -20,7 +20,8 @@ class WorkerVoucher(HistoryModel):
     insuree = models.ForeignKey(Insuree, null=True, blank=True, on_delete=models.DO_NOTHING)
     policyholder = models.ForeignKey(PolicyHolder, null=True, blank=True, on_delete=models.DO_NOTHING)
     code = models.CharField(max_length=255, blank=True, null=True)
-    status = models.CharField(max_length=255, blank=True, null=True, choices=Status.choices, default=Status.PENDING)
+    status = models.CharField(max_length=255, blank=True, null=True, choices=Status.choices,
+                              default=Status.AWAITING_PAYMENT)
     assigned_date = fields.DateField(blank=True, null=True)
     expiry_date = fields.DateField(blank=True, null=True)
 

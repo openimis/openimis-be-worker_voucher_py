@@ -6,6 +6,10 @@ DEFAULT_CONFIG = {
     "gql_worker_voucher_update_perms": ["204003"],
     "gql_worker_voucher_delete_perms": ["204004"],
     "gql_worker_voucher_search_all_perms": ["204005"],
+    "gql_worker_voucher_acquire_unassigned_perms": ["204006"],
+    "gql_worker_voucher_acquire_assigned_perms": ["204007"],
+
+    "price_per_voucher": "100.00",
 }
 
 
@@ -18,6 +22,10 @@ class WorkerVoucherConfig(AppConfig):
     gql_worker_voucher_update_perms = None
     gql_worker_voucher_delete_perms = None
     gql_worker_voucher_search_all_perms = None
+    gql_worker_voucher_acquire_unassigned_perms = None
+    gql_worker_voucher_acquire_assigned_perms = None
+
+    price_per_voucher = None
 
     def ready(self):
         from core.models import ModuleConfiguration

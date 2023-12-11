@@ -2,12 +2,15 @@ import graphene as graphene
 from django.db import transaction
 from pydantic.error_wrappers import ValidationError
 from django.contrib.auth.models import AnonymousUser
+from uuid import uuid4
 
+from core import datetime
 from core.gql.gql_mutations.base_mutation import BaseMutation
 from core.schema import OpenIMISMutation
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
-from worker_voucher.services import WorkerVoucherService
+from worker_voucher.services import WorkerVoucherService, validate_acquire_unassigned_voucher, \
+    validate_acquire_assigned_voucher
 
 
 class CreateWorkerVoucherInput(OpenIMISMutation.Input):
@@ -37,10 +40,8 @@ class CreateWorkerVoucherMutation(BaseMutation):
 
     @classmethod
     def _mutate(cls, user, **data):
-        if "client_mutation_id" in data:
-            data.pop('client_mutation_id')
-        if "client_mutation_label" in data:
-            data.pop('client_mutation_label')
+        data.pop('client_mutation_id', None)
+        data.pop('client_mutation_label', None)
 
         service = WorkerVoucherService(user)
         response = service.create(data)
@@ -65,8 +66,8 @@ class UpdateWorkerVoucherMutation(BaseMutation):
 
     @classmethod
     def _mutate(cls, user, **data):
-        if "client_mutation_label" in data:
-            data.pop('client_mutation_label')
+        data.pop('client_mutation_id', None)
+        data.pop('client_mutation_label', None)
 
         service = WorkerVoucherService(user)
         response = service.update(data)
@@ -91,10 +92,8 @@ class DeleteWorkerVoucherMutation(BaseMutation):
 
     @classmethod
     def _mutate(cls, user, **data):
-        if "client_mutation_id" in data:
-            data.pop('client_mutation_id')
-        if "client_mutation_label" in data:
-            data.pop('client_mutation_label')
+        data.pop('client_mutation_id', None)
+        data.pop('client_mutation_label', None)
 
         service = WorkerVoucherService(user)
         ids = data.get('ids')
@@ -105,3 +104,100 @@ class DeleteWorkerVoucherMutation(BaseMutation):
 
     class Input(OpenIMISMutation.Input):
         ids = graphene.List(graphene.UUID)
+
+
+class AcquireUnassignedVouchersMutation(BaseMutation):
+    _mutation_class = "AcquireUnassignedVouchersMutation"
+    _mutation_module = "worker_voucher"
+    _model = WorkerVoucher
+
+    @classmethod
+    def _validate_mutation(cls, user, **data):
+        if type(user) is AnonymousUser or not user.id or not user.has_perms(
+                WorkerVoucherConfig.gql_worker_voucher_acquire_unassigned_perms):
+            raise ValidationError("mutation.authentication_required")
+
+    @classmethod
+    def _mutate(cls, user, count=None, economic_unit_code=None, **data):
+        data.pop('client_mutation_id', None)
+        data.pop('client_mutation_label', None)
+
+        validate_result = validate_acquire_unassigned_voucher(user, economic_unit_code, count)
+        if not validate_result.get("success", False):
+            return validate_result
+
+        service = WorkerVoucherService(user)
+        voucher_ids = []
+        with transaction.atomic():
+            for _ in range(validate_result.get("data").get("count")):
+                service_result = service.create({
+                    "policyholder_id": validate_result.get("data").get("policyholder").id,
+                    "code": str(uuid4()),
+                    "expiry_date": datetime.datetime.now() + datetime.datetimedelta(months=1)
+                })
+                if service_result.get("success", False):
+                    voucher_ids.append(service_result.get("data").get("id"))
+                else:
+                    raise Exception(service_result["error"])
+
+        # TODO integrate with mPay and send payment request
+        return None
+
+    class Input(OpenIMISMutation.Input):
+        economic_unit_code = graphene.ID(required=True)
+        count = graphene.Int(required=True)
+
+
+class DateRangeInclusiveInputType(graphene.InputObjectType):
+    start_date = graphene.Date(required=True)
+    end_date = graphene.Date(required=True)
+
+
+class AcquireAssignedVouchersMutationInput(OpenIMISMutation.Input):
+    economic_unit_code = graphene.ID(required=True)
+    date_ranges = graphene.List(DateRangeInclusiveInputType, required=True)
+    workers = graphene.List(graphene.ID, required=True)
+
+
+class AcquireAssignedVouchersMutation(BaseMutation):
+    _mutation_class = "AcquireAssignedVouchersMutation"
+    _mutation_module = "worker_voucher"
+    _model = WorkerVoucher
+
+    @classmethod
+    def _validate_mutation(cls, user, **data):
+        if type(user) is AnonymousUser or not user.id or not user.has_perms(
+                WorkerVoucherConfig.gql_worker_voucher_acquire_assigned_perms):
+            raise ValidationError("mutation.authentication_required")
+
+    @classmethod
+    def _mutate(cls, user, count=None, economic_unit_code=None, workers=None, date_ranges=None, **data):
+        data.pop('client_mutation_id', None)
+        data.pop('client_mutation_label', None)
+
+        validate_result = validate_acquire_assigned_voucher(user, economic_unit_code, workers, date_ranges)
+        if not validate_result.get("success", False):
+            return validate_result
+
+        service = WorkerVoucherService(user)
+        voucher_ids = []
+        with transaction.atomic():
+            for date in validate_result.get("data").get("dates"):
+                for insuree in validate_result.get("data").get("insurees"):
+                    service_result = service.create({
+                        "policyholder_id": validate_result.get("data").get("policyholder").id,
+                        "insuree_id": insuree.id,
+                        "code": str(uuid4()),
+                        "assigned_date": date,
+                        "expiry_date": datetime.datetime.now() + datetime.datetimedelta(months=1)
+                    })
+                    if service_result.get("success", False):
+                        voucher_ids.append(service_result.get("data").get("id"))
+                    else:
+                        raise Exception(service_result["error"])
+
+        # TODO integrate with mPay and send payment request
+        return None
+
+    class Input(AcquireAssignedVouchersMutationInput):
+        pass
