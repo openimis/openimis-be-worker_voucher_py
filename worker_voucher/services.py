@@ -71,7 +71,11 @@ def validate_acquire_unassigned_voucher(user: User, eu_code: str, count: Union[i
                     "error": _(f"Economic unit {eu_code} does not exists"), }
         count = int(count)
         if count < 1:
-            raise AttributeError(_("Count have to be greater than 0"))
+            return {"success": False,
+                    "error": _("Count have to be greater than 0"), }
+        if count > WorkerVoucherConfig.max_generic_vouchers:
+            return {"success": False,
+                    "error": _("Max voucher count exceeded"), }
         return {
             "success": True,
             "data": {
@@ -115,6 +119,9 @@ def validate_acquire_assigned_voucher(user: User, eu_code: str, workers: List[st
                     raise Exception(_(f"Date {date} in more than one range"))
                 else:
                     dates.add(date)
+        if not dates:
+            return {"success": False,
+                    "error": _(f"No valid dates"), }
         if WorkerVoucher.objects.filter(
                 insuree__in=insurees,
                 assigned_date__in=dates,

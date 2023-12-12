@@ -10,6 +10,7 @@ DEFAULT_CONFIG = {
     "gql_worker_voucher_acquire_assigned_perms": ["204007"],
 
     "price_per_voucher": "100.00",
+    "max_generic_vouchers": 1000
 }
 
 
@@ -26,6 +27,7 @@ class WorkerVoucherConfig(AppConfig):
     gql_worker_voucher_acquire_assigned_perms = None
 
     price_per_voucher = None
+    max_generic_vouchers = None
 
     def ready(self):
         from core.models import ModuleConfiguration
