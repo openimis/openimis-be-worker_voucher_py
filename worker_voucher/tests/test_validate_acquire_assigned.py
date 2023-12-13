@@ -7,7 +7,7 @@ from core.test_helpers import create_test_interactive_user
 from insuree.test_helpers import create_test_insuree
 from policyholder.models import PolicyHolderUser
 from policyholder.tests import create_test_policy_holder
-from worker_voucher.services import validate_acquire_assigned_voucher
+from worker_voucher.services import validate_acquire_assigned_vouchers
 
 
 class ValidateAcquireAssignedTestCase(TestCase):
@@ -44,7 +44,7 @@ class ValidateAcquireAssignedTestCase(TestCase):
             ({'start_date': self.today, 'end_date': self.today},)
         )
 
-        res = validate_acquire_assigned_voucher(*payload)
+        res = validate_acquire_assigned_vouchers(*payload)
         self.assertTrue(res['success'])
         self.assertEquals(res['data']['count'], 1)
 
@@ -56,7 +56,7 @@ class ValidateAcquireAssignedTestCase(TestCase):
             ({'start_date': self.today, 'end_date': self.today},)
         )
 
-        res = validate_acquire_assigned_voucher(*payload)
+        res = validate_acquire_assigned_vouchers(*payload)
         self.assertFalse(res['success'])
 
     def test_validate_ph_not_exists(self):
@@ -67,7 +67,7 @@ class ValidateAcquireAssignedTestCase(TestCase):
             ({'start_date': self.today, 'end_date': self.today},)
         )
 
-        res = validate_acquire_assigned_voucher(*payload)
+        res = validate_acquire_assigned_vouchers(*payload)
         self.assertFalse(res['success'])
 
     def test_validate_dates_overlap(self):
@@ -79,5 +79,5 @@ class ValidateAcquireAssignedTestCase(TestCase):
              {'start_date': self.today, 'end_date': self.tomorrow},)
         )
 
-        res = validate_acquire_assigned_voucher(*payload)
+        res = validate_acquire_assigned_vouchers(*payload)
         self.assertFalse(res['success'])

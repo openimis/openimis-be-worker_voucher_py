@@ -27,3 +27,21 @@ mutation acquireUnassigned {
   }
 }
 """
+
+gql_mutation_assign = """
+mutation assignVouchers {
+  assignVouchers(input: {
+    economicUnitCode: "%s",
+    workers: ["%s"]
+    dateRanges: [
+      {
+        startDate: "%s", 
+        endDate: "%s"
+      }
+    ],
+    clientMutationId: "%s"    
+  }) {
+    clientMutationId
+  }
+}
+"""
