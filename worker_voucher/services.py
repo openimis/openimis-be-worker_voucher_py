@@ -124,8 +124,8 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
                 "dates": dates,
                 "unassigned_vouchers": list(unassigned_vouchers),
                 "count": count,
-                "price_per_voucher": 0,
-                "price": 0
+                "price_per_voucher": Decimal("0"),
+                "price": Decimal("0")
             }
         }
     except Exception as e:
