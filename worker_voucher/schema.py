@@ -73,7 +73,9 @@ class Query(graphene.ObjectType):
         Query._check_permissions(info.context.user, InsureeConfig.gql_query_insuree_perms)
         filters = append_validity_filter(**kwargs)
 
-        query = Insuree.get_queryset(None, info.context.user).filter(
+        # This query inner joins workervoucher and duplicates insuree for every voucher for some reason
+        # distinct added to fix that
+        query = Insuree.get_queryset(None, info.context.user).distinct('id').filter(
             validity_to__isnull=True,
             workervoucher__is_deleted=False,
             workervoucher__policyholder__is_deleted=False,
@@ -105,10 +107,11 @@ class Query(graphene.ObjectType):
         return AcquireVouchersValidationSummaryGQLType(**validation_summary)
 
     def resolve_acquire_assigned_validation(self, info, economic_unit_code=None, workers=None, date_ranges=None,
-                                              **kwargs):
+                                            **kwargs):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_acquire_assigned_perms)
 
-        validation_result = validate_acquire_assigned_vouchers(info.context.user, economic_unit_code, workers, date_ranges)
+        validation_result = validate_acquire_assigned_vouchers(info.context.user, economic_unit_code, workers,
+                                                               date_ranges)
         if not validation_result.get("success", False):
             raise AttributeError(validation_result.get("error", _("Unknown Error")))
 
@@ -119,7 +122,7 @@ class Query(graphene.ObjectType):
         return AcquireVouchersValidationSummaryGQLType(**validation_summary)
 
     def resolve_assign_vouchers_validation(self, info, economic_unit_code=None, workers=None, date_ranges=None,
-                                              **kwargs):
+                                           **kwargs):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_assign_vouchers_perms)
 
         validation_result = validate_assign_vouchers(info.context.user, economic_unit_code, workers, date_ranges)

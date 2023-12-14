@@ -9,7 +9,7 @@ mutation acquireAssigned {
         endDate: "%s"
       }
     ],
-    clientMutationId: "%s"    
+    clientMutationId: "%s"
   }) {
     clientMutationId
   }

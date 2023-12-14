@@ -52,3 +52,14 @@ class ValidateAssignVouchersTestCase(TestCase):
         res = validate_assign_vouchers(*payload)
         self.assertTrue(res['success'], res.get('error'))
         self.assertEquals(res['data']['count'], 1)
+
+    def test_validate_not_enough_vouchers(self):
+        payload = (
+            self.user,
+            self.policyholder.code,
+            (self.insuree.chf_id,),
+            ({'start_date': self.today, 'end_date': self.tomorrow},)
+        )
+
+        res = validate_assign_vouchers(*payload)
+        self.assertFalse(res['success'])

@@ -202,6 +202,7 @@ class AcquireAssignedVouchersMutation(BaseMutation):
     class Input(AcquireAssignedVouchersMutationInput):
         pass
 
+
 class AssignVouchersMutationInput(OpenIMISMutation.Input):
     economic_unit_code = graphene.ID(required=True)
     date_ranges = graphene.List(DateRangeInclusiveInputType, required=True)
