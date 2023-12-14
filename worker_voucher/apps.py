@@ -11,7 +11,11 @@ DEFAULT_CONFIG = {
     "gql_worker_voucher_assign_vouchers_perms": ["204008"],
 
     "price_per_voucher": "100.00",
-    "max_generic_vouchers": 1000
+    "max_generic_vouchers": 1000,
+    #  This filed should be a valid datetimedelata input
+    "voucher_expiry_period": {
+        "months": 1
+    }
 }
 
 
@@ -30,6 +34,7 @@ class WorkerVoucherConfig(AppConfig):
 
     price_per_voucher = None
     max_generic_vouchers = None
+    voucher_expiry_period = None
 
     def ready(self):
         from core.models import ModuleConfiguration

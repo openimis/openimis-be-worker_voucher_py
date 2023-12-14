@@ -17,6 +17,10 @@ from worker_voucher.validation import WorkerVoucherValidation
 logger = logging.getLogger(__name__)
 
 
+class VoucherValidationException(Exception):
+    pass
+
+
 class WorkerVoucherService(BaseService):
     OBJECT_TYPE = WorkerVoucher
 
@@ -80,7 +84,7 @@ def validate_acquire_unassigned_vouchers(user: User, eu_code: str, count: Union[
                 "price": price_per_voucher * count
             }
         }
-    except Exception as e:
+    except VoucherValidationException as e:
         return {"success": False, "error": str(e)}
 
 
@@ -103,7 +107,7 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
                 "price": price_per_voucher * count
             }
         }
-    except Exception as e:
+    except VoucherValidationException as e:
         return {"success": False, "error": str(e)}
 
 
@@ -128,7 +132,7 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
                 "price": Decimal("0")
             }
         }
-    except Exception as e:
+    except VoucherValidationException as e:
         return {"success": False, "error": str(e)}
 
 
@@ -137,7 +141,7 @@ def _check_ph(user: User, eu_code: str):
         return PolicyHolder.objects.get(code=eu_code, is_deleted=False, policyholderuser__user=user,
                                         policyholderuser__is_deleted=False)
     except PolicyHolder.DoesNotExist:
-        raise Exception(_(f"Economic unit {eu_code} does not exists"))
+        raise VoucherValidationException(_(f"Economic unit {eu_code} does not exists"))
 
 
 def _check_insurees(workers: List[str]):
@@ -146,17 +150,19 @@ def _check_insurees(workers: List[str]):
         try:
             ins = Insuree.objects.get(chf_id=code, validity_to__isnull=True)
         except Insuree.DoesNotExist:
-            raise Exception(_(f"Worker {code} does not exists"))
+            raise VoucherValidationException(_(f"Worker {code} does not exists"))
         if ins in insurees:
-            raise Exception(_(f"Duplicate worker: {code}"))
+            raise VoucherValidationException(_(f"Duplicate worker: {code}"))
         else:
             insurees.add(ins)
     if not insurees:
-        raise Exception(_("No valid workers"))
+        raise VoucherValidationException(_("No valid workers"))
     return insurees
 
 
 def _check_dates(date_ranges: List[Dict]):
+    expiry_period = WorkerVoucherConfig.voucher_expiry_period
+    max_date = datetime.date.today() + datetime.datetimedelta(**expiry_period)
     dates = set()
     for date_range in date_ranges:
         start_date, end_date = date_range.get("start_date"), date_range.get("end_date")
@@ -164,11 +170,13 @@ def _check_dates(date_ranges: List[Dict]):
         for date in (datetime.date.from_ad_date(start_date) + datetime.datetimedelta(days=n) for n in
                      range(day_count)):
             if date in dates:
-                raise Exception(_(f"Date {date} in more than one range"))
+                raise VoucherValidationException(_(f"Date {date} in more than one range"))
+            if date > max_date:
+                raise VoucherValidationException(_(f"Date {date} after voucher expiry date"))
             else:
                 dates.add(date)
     if not dates:
-        raise Exception(_(f"No valid dates"))
+        raise VoucherValidationException(_(f"No valid dates"))
     return dates
 
 
@@ -179,7 +187,7 @@ def _check_existing_active_vouchers(ph, insurees, dates):
             policyholder=ph,
             status__in=(WorkerVoucher.Status.ASSIGNED, WorkerVoucher.Status.AWAITING_PAYMENT),
             is_deleted=False).exists():
-        raise Exception(_("One or more workers have assigned vouchers in specified ranges"))
+        raise VoucherValidationException(_("One or more workers have assigned vouchers in specified ranges"))
 
 
 def _check_unassigned_vouchers(ph, dates, count):
@@ -193,5 +201,5 @@ def _check_unassigned_vouchers(ph, dates, count):
         status=WorkerVoucher.Status.UNASSIGNED,
         is_deleted=False).order_by('expiry_date')[:count]
     if unassigned_vouchers.count() < count:
-        raise Exception(_(f"Not enough unassigned vouchers"))
+        raise VoucherValidationException(_(f"Not enough unassigned vouchers"))
     return unassigned_vouchers

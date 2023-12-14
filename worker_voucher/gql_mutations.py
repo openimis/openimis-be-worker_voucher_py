@@ -126,6 +126,7 @@ class AcquireUnassignedVouchersMutation(BaseMutation):
         if not validate_result.get("success", False):
             return validate_result
 
+        expiry_period = WorkerVoucherConfig.voucher_expiry_period
         service = WorkerVoucherService(user)
         voucher_ids = []
         with transaction.atomic():
@@ -133,7 +134,7 @@ class AcquireUnassignedVouchersMutation(BaseMutation):
                 service_result = service.create({
                     "policyholder_id": validate_result.get("data").get("policyholder").id,
                     "code": str(uuid4()),
-                    "expiry_date": datetime.datetime.now() + datetime.datetimedelta(months=1)
+                    "expiry_date": datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
                 })
                 if service_result.get("success", False):
                     voucher_ids.append(service_result.get("data").get("id"))
@@ -179,6 +180,7 @@ class AcquireAssignedVouchersMutation(BaseMutation):
         if not validate_result.get("success", False):
             return validate_result
 
+        expiry_period = WorkerVoucherConfig.voucher_expiry_period
         service = WorkerVoucherService(user)
         voucher_ids = []
         with transaction.atomic():
@@ -189,7 +191,7 @@ class AcquireAssignedVouchersMutation(BaseMutation):
                         "insuree_id": insuree.id,
                         "code": str(uuid4()),
                         "assigned_date": date,
-                        "expiry_date": datetime.datetime.now() + datetime.datetimedelta(months=1)
+                        "expiry_date": datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
                     })
                     if service_result.get("success", True):
                         voucher_ids.append(service_result.get("data").get("id"))
