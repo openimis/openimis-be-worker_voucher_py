@@ -34,3 +34,10 @@ class WorkerVoucherGQLType(DjangoObjectType):
 
     def resolve_date_updated_as_date(self, info, **kwargs):
         return self.date_updated.to_ad_date()
+
+
+class AcquireVouchersValidationSummaryGQLType(graphene.ObjectType):
+    price = graphene.Decimal()
+    count = graphene.Int()
+    price_per_voucher = graphene.Decimal()
+

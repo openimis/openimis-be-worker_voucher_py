@@ -1,2 +1,4 @@
 from worker_voucher.tests.test_worker_enquire import WorkerEnquireTestCase
 from worker_voucher.tests.test_voucher_user_filter import VoucherUserTestCase
+from worker_voucher.tests.test_validate_acquire_assigned import ValidateAcquireAssignedTestCase
+from worker_voucher.tests.test_validate_acquire_unassigned import ValidateAcquireUnassignedTestCase
