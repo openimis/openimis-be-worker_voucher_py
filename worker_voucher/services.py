@@ -68,6 +68,7 @@ def validate_acquire_unassigned_vouchers(user: User, eu_code: str, count: Union[
     try:
         price_per_voucher = Decimal(WorkerVoucherConfig.price_per_voucher)
         ph = _check_ph(user, eu_code)
+
         count = int(count)
         if count < 1:
             return {"success": False,
@@ -95,6 +96,7 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
         insurees = _check_insurees(workers)
         dates = _check_dates(date_ranges)
         _check_existing_active_vouchers(ph, insurees, dates)
+
         count = len(insurees) * len(dates)
         return {
             "success": True,
@@ -203,3 +205,4 @@ def _check_unassigned_vouchers(ph, dates, count):
     if unassigned_vouchers.count() < count:
         raise VoucherValidationException(_(f"Not enough unassigned vouchers"))
     return unassigned_vouchers
+

@@ -45,6 +45,7 @@ class ValidateAcquireAssignedTestCase(TestCase):
         )
 
         res = validate_acquire_assigned_vouchers(*payload)
+
         self.assertTrue(res['success'])
         self.assertEquals(res['data']['count'], 1)
 
@@ -57,6 +58,7 @@ class ValidateAcquireAssignedTestCase(TestCase):
         )
 
         res = validate_acquire_assigned_vouchers(*payload)
+
         self.assertFalse(res['success'])
 
     def test_validate_ph_not_exists(self):
@@ -68,6 +70,7 @@ class ValidateAcquireAssignedTestCase(TestCase):
         )
 
         res = validate_acquire_assigned_vouchers(*payload)
+
         self.assertFalse(res['success'])
 
     def test_validate_dates_overlap(self):
@@ -80,4 +83,5 @@ class ValidateAcquireAssignedTestCase(TestCase):
         )
 
         res = validate_acquire_assigned_vouchers(*payload)
+
         self.assertFalse(res['success'])

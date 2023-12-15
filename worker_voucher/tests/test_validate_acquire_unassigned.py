@@ -33,6 +33,7 @@ class ValidateAcquireUnassignedTestCase(TestCase):
         )
 
         res = validate_acquire_unassigned_vouchers(*payload)
+
         self.assertTrue(res['success'])
         self.assertEquals(res['data']['count'], 1)
 
@@ -44,6 +45,7 @@ class ValidateAcquireUnassignedTestCase(TestCase):
         )
 
         res = validate_acquire_unassigned_vouchers(*payload)
+
         self.assertFalse(res['success'])
 
     def test_validate_count_too_high(self):
@@ -54,6 +56,7 @@ class ValidateAcquireUnassignedTestCase(TestCase):
         )
 
         res = validate_acquire_unassigned_vouchers(*payload)
+
         self.assertFalse(res['success'])
 
     def test_validate_ph_not_exists(self):
@@ -64,4 +67,5 @@ class ValidateAcquireUnassignedTestCase(TestCase):
         )
 
         res = validate_acquire_unassigned_vouchers(*payload)
+
         self.assertFalse(res['success'])

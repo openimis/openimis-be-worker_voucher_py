@@ -99,6 +99,7 @@ class Query(graphene.ObjectType):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_acquire_unassigned_perms)
 
         validation_result = validate_acquire_unassigned_vouchers(info.context.user, economic_unit_code, count)
+
         if not validation_result.get("success", False):
             raise AttributeError(validation_result.get("error", _("Unknown Error")))
 
@@ -112,6 +113,7 @@ class Query(graphene.ObjectType):
 
         validation_result = validate_acquire_assigned_vouchers(info.context.user, economic_unit_code, workers,
                                                                date_ranges)
+
         if not validation_result.get("success", False):
             raise AttributeError(validation_result.get("error", _("Unknown Error")))
 

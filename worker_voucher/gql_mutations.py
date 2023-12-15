@@ -127,6 +127,7 @@ class AcquireUnassignedVouchersMutation(BaseMutation):
             return validate_result
 
         expiry_period = WorkerVoucherConfig.voucher_expiry_period
+
         service = WorkerVoucherService(user)
         voucher_ids = []
         with transaction.atomic():
@@ -135,11 +136,12 @@ class AcquireUnassignedVouchersMutation(BaseMutation):
                     "policyholder_id": validate_result.get("data").get("policyholder").id,
                     "code": str(uuid4()),
                     "expiry_date": datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
+
                 })
-                if service_result.get("success", False):
-                    voucher_ids.append(service_result.get("data").get("id"))
-                else:
-                    raise Exception(service_result["error"])
+        if service_result.get("success", False):
+            voucher_ids.append(service_result.get("data").get("id"))
+        else:
+            raise Exception(service_result["error"])
 
         # TODO integrate with mPay and send payment request
         return None
@@ -181,6 +183,7 @@ class AcquireAssignedVouchersMutation(BaseMutation):
             return validate_result
 
         expiry_period = WorkerVoucherConfig.voucher_expiry_period
+
         service = WorkerVoucherService(user)
         voucher_ids = []
         with transaction.atomic():
