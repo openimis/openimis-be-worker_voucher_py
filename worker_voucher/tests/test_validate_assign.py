@@ -1,19 +1,20 @@
+from uuid import uuid4
 from django.test import TestCase
-
-from core import datetime
 from core.models import Role
-
+from core import datetime
 from core.test_helpers import create_test_interactive_user
 from insuree.test_helpers import create_test_insuree
 from policyholder.models import PolicyHolderUser
 from policyholder.tests import create_test_policy_holder
-from worker_voucher.services import validate_acquire_assigned_vouchers
+from worker_voucher.models import WorkerVoucher
+from worker_voucher.services import validate_assign_vouchers
 
 
-class ValidateAcquireAssignedTestCase(TestCase):
+class ValidateAssignVouchersTestCase(TestCase):
     user = None
     insuree = None
     policyholder = None
+    unassigned_voucher = None
 
     today = None,
     yesterday = None,
@@ -21,7 +22,7 @@ class ValidateAcquireAssignedTestCase(TestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(ValidateAcquireAssignedTestCase, cls).setUpClass()
+        super(ValidateAssignVouchersTestCase, cls).setUpClass()
 
         role_employer = Role.objects.get(name='Employer', validity_to__isnull=True)
 
@@ -36,6 +37,10 @@ class ValidateAcquireAssignedTestCase(TestCase):
         cls.tomorrow = datetime.date.today() + datetime.datetimedelta(days=1)
         cls.yesterday = datetime.date.today() - datetime.datetimedelta(days=1)
 
+        cls.unassigned_voucher = WorkerVoucher(code=uuid4(), expiry_date=cls.tomorrow, policyholder=cls.policyholder,
+                                               status=WorkerVoucher.Status.UNASSIGNED)
+        cls.unassigned_voucher.save(username=cls.user.username)
+
     def test_validate_success(self):
         payload = (
             self.user,
@@ -44,44 +49,17 @@ class ValidateAcquireAssignedTestCase(TestCase):
             ({'start_date': self.today, 'end_date': self.today},)
         )
 
-        res = validate_acquire_assigned_vouchers(*payload)
-
-        self.assertTrue(res['success'])
+        res = validate_assign_vouchers(*payload)
+        self.assertTrue(res['success'], res.get('error'))
         self.assertEquals(res['data']['count'], 1)
 
-    def test_validate_ins_not_exists(self):
-        payload = (
-            self.user,
-            self.policyholder.code,
-            ("non existent chfid",),
-            ({'start_date': self.today, 'end_date': self.today},)
-        )
-
-        res = validate_acquire_assigned_vouchers(*payload)
-
-        self.assertFalse(res['success'])
-
-    def test_validate_ph_not_exists(self):
-        payload = (
-            self.user,
-            "non existent ph code",
-            (self.insuree.chf_id,),
-            ({'start_date': self.today, 'end_date': self.today},)
-        )
-
-        res = validate_acquire_assigned_vouchers(*payload)
-
-        self.assertFalse(res['success'])
-
-    def test_validate_dates_overlap(self):
+    def test_validate_not_enough_vouchers(self):
         payload = (
             self.user,
             self.policyholder.code,
             (self.insuree.chf_id,),
-            ({'start_date': self.yesterday, 'end_date': self.today},
-             {'start_date': self.today, 'end_date': self.tomorrow},)
+            ({'start_date': self.today, 'end_date': self.tomorrow},)
         )
 
-        res = validate_acquire_assigned_vouchers(*payload)
-
+        res = validate_assign_vouchers(*payload)
         self.assertFalse(res['success'])

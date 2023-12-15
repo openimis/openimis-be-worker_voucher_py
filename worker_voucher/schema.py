@@ -13,10 +13,10 @@ from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.gql_queries import WorkerVoucherGQLType, AcquireVouchersValidationSummaryGQLType
 from worker_voucher.gql_mutations import CreateWorkerVoucherMutation, UpdateWorkerVoucherMutation, \
     DeleteWorkerVoucherMutation, AcquireUnassignedVouchersMutation, AcquireAssignedVouchersMutation, \
-    DateRangeInclusiveInputType
+    DateRangeInclusiveInputType, AssignVouchersMutation
 from worker_voucher.models import WorkerVoucher
-from worker_voucher.services import get_voucher_worker_enquire_filters, validate_acquire_unassigned_voucher, \
-    validate_acquire_assigned_voucher
+from worker_voucher.services import get_voucher_worker_enquire_filters, validate_acquire_unassigned_vouchers, \
+    validate_acquire_assigned_vouchers, validate_assign_vouchers
 
 
 class Query(graphene.ObjectType):
@@ -52,6 +52,13 @@ class Query(graphene.ObjectType):
         date_ranges=graphene.List(DateRangeInclusiveInputType)
     )
 
+    assign_vouchers_validation = graphene.Field(
+        AcquireVouchersValidationSummaryGQLType,
+        economic_unit_code=graphene.ID(),
+        workers=graphene.List(graphene.ID),
+        date_ranges=graphene.List(DateRangeInclusiveInputType)
+    )
+
     def resolve_worker_voucher(self, info, client_mutation_id=None, **kwargs):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_search_perms)
         filters = append_validity_filter(**kwargs)
@@ -66,7 +73,9 @@ class Query(graphene.ObjectType):
         Query._check_permissions(info.context.user, InsureeConfig.gql_query_insuree_perms)
         filters = append_validity_filter(**kwargs)
 
-        query = Insuree.get_queryset(None, info.context.user).filter(
+        # This query inner joins workervoucher and duplicates insuree for every voucher for some reason
+        # distinct added to fix that
+        query = Insuree.get_queryset(None, info.context.user).distinct('id').filter(
             validity_to__isnull=True,
             workervoucher__is_deleted=False,
             workervoucher__policyholder__is_deleted=False,
@@ -89,7 +98,8 @@ class Query(graphene.ObjectType):
     def resolve_acquire_unassigned_validation(self, info, economic_unit_code=None, count=None, **kwargs):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_acquire_unassigned_perms)
 
-        validation_result = validate_acquire_unassigned_voucher(info.context.user, economic_unit_code, count)
+        validation_result = validate_acquire_unassigned_vouchers(info.context.user, economic_unit_code, count)
+
         if not validation_result.get("success", False):
             raise AttributeError(validation_result.get("error", _("Unknown Error")))
 
@@ -98,10 +108,12 @@ class Query(graphene.ObjectType):
         return AcquireVouchersValidationSummaryGQLType(**validation_summary)
 
     def resolve_acquire_assigned_validation(self, info, economic_unit_code=None, workers=None, date_ranges=None,
-                                              **kwargs):
+                                            **kwargs):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_acquire_assigned_perms)
 
-        validation_result = validate_acquire_assigned_voucher(info.context.user, economic_unit_code, workers, date_ranges)
+        validation_result = validate_acquire_assigned_vouchers(info.context.user, economic_unit_code, workers,
+                                                               date_ranges)
+
         if not validation_result.get("success", False):
             raise AttributeError(validation_result.get("error", _("Unknown Error")))
 
@@ -109,6 +121,21 @@ class Query(graphene.ObjectType):
         validation_summary.pop("policyholder")
         validation_summary.pop("insurees")
         validation_summary.pop("dates")
+        return AcquireVouchersValidationSummaryGQLType(**validation_summary)
+
+    def resolve_assign_vouchers_validation(self, info, economic_unit_code=None, workers=None, date_ranges=None,
+                                           **kwargs):
+        Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_assign_vouchers_perms)
+
+        validation_result = validate_assign_vouchers(info.context.user, economic_unit_code, workers, date_ranges)
+        if not validation_result.get("success", False):
+            raise AttributeError(validation_result.get("error", _("Unknown Error")))
+
+        validation_summary = validation_result.get("data")
+        validation_summary.pop("policyholder")
+        validation_summary.pop("insurees")
+        validation_summary.pop("dates")
+        validation_summary.pop("unassigned_vouchers")
         return AcquireVouchersValidationSummaryGQLType(**validation_summary)
 
     @staticmethod
@@ -124,3 +151,4 @@ class Mutation(graphene.ObjectType):
 
     acquire_unassigned_vouchers = AcquireUnassignedVouchersMutation.Field()
     acquire_assigned_vouchers = AcquireAssignedVouchersMutation.Field()
+    assign_vouchers = AssignVouchersMutation.Field()

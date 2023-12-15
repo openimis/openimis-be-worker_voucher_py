@@ -40,4 +40,3 @@ class AcquireVouchersValidationSummaryGQLType(graphene.ObjectType):
     price = graphene.Decimal()
     count = graphene.Int()
     price_per_voucher = graphene.Decimal()
-

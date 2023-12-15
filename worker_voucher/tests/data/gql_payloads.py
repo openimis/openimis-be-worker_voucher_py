@@ -9,7 +9,7 @@ mutation acquireAssigned {
         endDate: "%s"
       }
     ],
-    clientMutationId: "%s"    
+    clientMutationId: "%s"
   }) {
     clientMutationId
   }
@@ -22,6 +22,24 @@ mutation acquireUnassigned {
     economicUnitCode: "%s",
     count: %s,
     clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""
+
+gql_mutation_assign = """
+mutation assignVouchers {
+  assignVouchers(input: {
+    economicUnitCode: "%s",
+    workers: ["%s"]
+    dateRanges: [
+      {
+        startDate: "%s", 
+        endDate: "%s"
+      }
+    ],
+    clientMutationId: "%s"    
   }) {
     clientMutationId
   }

@@ -6,17 +6,12 @@ from core.test_helpers import create_test_interactive_user
 from policyholder.models import PolicyHolderUser
 from policyholder.tests import create_test_policy_holder
 from worker_voucher.apps import WorkerVoucherConfig
-from worker_voucher.services import validate_acquire_unassigned_voucher
+from worker_voucher.services import validate_acquire_unassigned_vouchers
 
 
 class ValidateAcquireUnassignedTestCase(TestCase):
     user = None
-    insuree = None
     policyholder = None
-
-    today = None,
-    yesterday = None,
-    tomorrow = None
 
     @classmethod
     def setUpClass(cls):
@@ -37,7 +32,8 @@ class ValidateAcquireUnassignedTestCase(TestCase):
             1
         )
 
-        res = validate_acquire_unassigned_voucher(*payload)
+        res = validate_acquire_unassigned_vouchers(*payload)
+
         self.assertTrue(res['success'])
         self.assertEquals(res['data']['count'], 1)
 
@@ -48,7 +44,8 @@ class ValidateAcquireUnassignedTestCase(TestCase):
             0
         )
 
-        res = validate_acquire_unassigned_voucher(*payload)
+        res = validate_acquire_unassigned_vouchers(*payload)
+
         self.assertFalse(res['success'])
 
     def test_validate_count_too_high(self):
@@ -58,7 +55,8 @@ class ValidateAcquireUnassignedTestCase(TestCase):
             WorkerVoucherConfig.max_generic_vouchers + 1
         )
 
-        res = validate_acquire_unassigned_voucher(*payload)
+        res = validate_acquire_unassigned_vouchers(*payload)
+
         self.assertFalse(res['success'])
 
     def test_validate_ph_not_exists(self):
@@ -68,5 +66,6 @@ class ValidateAcquireUnassignedTestCase(TestCase):
             1
         )
 
-        res = validate_acquire_unassigned_voucher(*payload)
+        res = validate_acquire_unassigned_vouchers(*payload)
+
         self.assertFalse(res['success'])
