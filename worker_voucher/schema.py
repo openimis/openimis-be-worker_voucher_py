@@ -4,6 +4,8 @@ import graphene_django_optimizer as gql_optimizer
 from django.db.models import Q
 from django.utils.translation import gettext as _
 from django.contrib.auth.models import AnonymousUser
+
+from core.gql.export_mixin import ExportableQueryMixin
 from core.schema import OrderedDjangoFilterConnectionField
 from core.utils import append_validity_filter
 from insuree.apps import InsureeConfig
@@ -19,8 +21,9 @@ from worker_voucher.services import get_voucher_worker_enquire_filters, validate
     validate_acquire_assigned_vouchers, validate_assign_vouchers
 
 
-class Query(graphene.ObjectType):
-    module_name = "tasks_management"
+class Query(ExportableQueryMixin, graphene.ObjectType):
+    exportable_fields = ['worker_voucher']
+    module_name = "worker_voucher"
 
     worker_voucher = OrderedDjangoFilterConnectionField(
         WorkerVoucherGQLType,
