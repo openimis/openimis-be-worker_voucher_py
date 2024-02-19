@@ -100,7 +100,8 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
     def resolve_acquire_unassigned_validation(self, info, economic_unit_code=None, count=None, **kwargs):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_acquire_unassigned_perms)
-
+        if not WorkerVoucherConfig.unassigned_voucher_enabled:
+            raise AttributeError("worker_voucher.validation.unassigned_voucher_disabled")
         validation_result = validate_acquire_unassigned_vouchers(info.context.user, economic_unit_code, count)
 
         if not validation_result.get("success", False):
@@ -129,7 +130,8 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
     def resolve_assign_vouchers_validation(self, info, economic_unit_code=None, workers=None, date_ranges=None,
                                            **kwargs):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_assign_vouchers_perms)
-
+        if not WorkerVoucherConfig.unassigned_voucher_enabled:
+            raise AttributeError("worker_voucher.validation.unassigned_voucher_disabled")
         validation_result = validate_assign_vouchers(info.context.user, economic_unit_code, workers, date_ranges)
         if not validation_result.get("success", False):
             raise AttributeError(validation_result.get("error", _("Unknown Error")))
