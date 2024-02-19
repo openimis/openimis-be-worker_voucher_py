@@ -9,7 +9,7 @@ DEFAULT_CONFIG = {
     "gql_worker_voucher_acquire_unassigned_perms": ["204006"],
     "gql_worker_voucher_acquire_assigned_perms": ["204007"],
     "gql_worker_voucher_assign_vouchers_perms": ["204008"],
-
+    "unassigned_voucher_enabled": False,
     "price_per_voucher": "100.00",
     "max_generic_vouchers": 1000,
     #  This filed should be a valid datetimedelata input
@@ -32,6 +32,7 @@ class WorkerVoucherConfig(AppConfig):
     gql_worker_voucher_acquire_assigned_perms = None
     gql_worker_voucher_assign_vouchers_perms = None
 
+    unassigned_voucher_enabled = None
     price_per_voucher = None
     max_generic_vouchers = None
     voucher_expiry_period = None

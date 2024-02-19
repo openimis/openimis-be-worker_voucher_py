@@ -1,7 +1,7 @@
 import graphene as graphene
 from django.db import transaction
-from pydantic.error_wrappers import ValidationError
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ValidationError
 from uuid import uuid4
 
 from core import datetime
@@ -113,6 +113,9 @@ class AcquireUnassignedVouchersMutation(BaseMutation):
 
     @classmethod
     def _validate_mutation(cls, user, **data):
+        if not WorkerVoucherConfig.unassigned_voucher_enabled:
+            raise ValidationError("worker_voucher.validation.unassigned_voucher_disabled")
+
         if type(user) is AnonymousUser or not user.id or not user.has_perms(
                 WorkerVoucherConfig.gql_worker_voucher_acquire_unassigned_perms):
             raise ValidationError("mutation.authentication_required")
@@ -221,6 +224,9 @@ class AssignVouchersMutation(BaseMutation):
 
     @classmethod
     def _validate_mutation(cls, user, **data):
+        if not WorkerVoucherConfig.unassigned_voucher_enabled:
+            raise ValidationError("worker_voucher.validation.unassigned_voucher_disabled")
+
         if type(user) is AnonymousUser or not user.id or not user.has_perms(
                 WorkerVoucherConfig.gql_worker_voucher_assign_vouchers_perms):
             raise ValidationError("mutation.authentication_required")
