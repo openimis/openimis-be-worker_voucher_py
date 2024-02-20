@@ -1,6 +1,8 @@
 import logging
 from decimal import Decimal
 from typing import Iterable, Dict, Union, List
+from uuid import uuid4
+
 from django.db.models import Q
 from django.utils.translation import gettext as _
 
@@ -9,6 +11,8 @@ from core.models import InteractiveUser, User
 from core.services import BaseService
 from core.signals import register_service_signal
 from insuree.models import Insuree
+from invoice.models import Bill
+from invoice.services import BillService
 from policyholder.models import PolicyHolder
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
@@ -17,7 +21,7 @@ from worker_voucher.validation import WorkerVoucherValidation
 logger = logging.getLogger(__name__)
 
 
-class VoucherValidationException(Exception):
+class VoucherException(Exception):
     pass
 
 
@@ -85,7 +89,7 @@ def validate_acquire_unassigned_vouchers(user: User, eu_code: str, count: Union[
                 "price": price_per_voucher * count
             }
         }
-    except VoucherValidationException as e:
+    except VoucherException as e:
         return {"success": False, "error": str(e)}
 
 
@@ -109,7 +113,7 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
                 "price": price_per_voucher * count
             }
         }
-    except VoucherValidationException as e:
+    except VoucherException as e:
         return {"success": False, "error": str(e)}
 
 
@@ -134,7 +138,7 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
                 "price": Decimal("0")
             }
         }
-    except VoucherValidationException as e:
+    except VoucherException as e:
         return {"success": False, "error": str(e)}
 
 
@@ -143,7 +147,7 @@ def _check_ph(user: User, eu_code: str):
         return PolicyHolder.objects.get(code=eu_code, is_deleted=False, policyholderuser__user=user,
                                         policyholderuser__is_deleted=False)
     except PolicyHolder.DoesNotExist:
-        raise VoucherValidationException(_(f"Economic unit {eu_code} does not exists"))
+        raise VoucherException(_(f"Economic unit {eu_code} does not exists"))
 
 
 def _check_insurees(workers: List[str]):
@@ -152,13 +156,13 @@ def _check_insurees(workers: List[str]):
         try:
             ins = Insuree.objects.get(chf_id=code, validity_to__isnull=True)
         except Insuree.DoesNotExist:
-            raise VoucherValidationException(_(f"Worker {code} does not exists"))
+            raise VoucherException(_(f"Worker {code} does not exists"))
         if ins in insurees:
-            raise VoucherValidationException(_(f"Duplicate worker: {code}"))
+            raise VoucherException(_(f"Duplicate worker: {code}"))
         else:
             insurees.add(ins)
     if not insurees:
-        raise VoucherValidationException(_("No valid workers"))
+        raise VoucherException(_("No valid workers"))
     return insurees
 
 
@@ -172,13 +176,13 @@ def _check_dates(date_ranges: List[Dict]):
         for date in (datetime.date.from_ad_date(start_date) + datetime.datetimedelta(days=n) for n in
                      range(day_count)):
             if date in dates:
-                raise VoucherValidationException(_(f"Date {date} in more than one range"))
+                raise VoucherException(_(f"Date {date} in more than one range"))
             if date > max_date:
-                raise VoucherValidationException(_(f"Date {date} after voucher expiry date"))
+                raise VoucherException(_(f"Date {date} after voucher expiry date"))
             else:
                 dates.add(date)
     if not dates:
-        raise VoucherValidationException(_(f"No valid dates"))
+        raise VoucherException(_(f"No valid dates"))
     return dates
 
 
@@ -189,7 +193,7 @@ def _check_existing_active_vouchers(ph, insurees, dates):
             policyholder=ph,
             status__in=(WorkerVoucher.Status.ASSIGNED, WorkerVoucher.Status.AWAITING_PAYMENT),
             is_deleted=False).exists():
-        raise VoucherValidationException(_("One or more workers have assigned vouchers in specified ranges"))
+        raise VoucherException(_("One or more workers have assigned vouchers in specified ranges"))
 
 
 def _check_unassigned_vouchers(ph, dates, count):
@@ -203,6 +207,49 @@ def _check_unassigned_vouchers(ph, dates, count):
         status=WorkerVoucher.Status.UNASSIGNED,
         is_deleted=False).order_by('expiry_date')[:count]
     if unassigned_vouchers.count() < count:
-        raise VoucherValidationException(_(f"Not enough unassigned vouchers"))
+        raise VoucherException(_(f"Not enough unassigned vouchers"))
     return unassigned_vouchers
 
+
+def create_assigned_voucher(user, date, insuree, policyholder_id):
+    expiry_period = WorkerVoucherConfig.voucher_expiry_period
+    voucher_service = WorkerVoucherService(user)
+    service_result = voucher_service.create({
+        "policyholder_id": policyholder_id,
+        "insuree_id": insuree.id,
+        "code": str(uuid4()),
+        "assigned_date": date,
+        "expiry_date": datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
+    })
+    if service_result.get("success", True):
+        return service_result.get("data").get("id")
+    else:
+        raise VoucherException(service_result["error"])
+
+
+def create_voucher_bill(user, voucher_ids, policyholder_id):
+    bill_data = {
+        'subject_type': "policyholder",
+        'subject_id': policyholder_id,
+        'code': str(uuid4()),
+        'status': Bill.Status.VALIDATED
+    }
+
+    bill_data_line = []
+
+    for voucher_id in voucher_ids:
+        bill_data_line.append({
+            "code": str(uuid4()),
+            "line_type": "workervoucher",
+            "line_id": voucher_id,
+            "amount_net": Decimal(WorkerVoucherConfig.price_per_voucher),
+            "amount_total": Decimal(WorkerVoucherConfig.price_per_voucher),
+        })
+
+    bill_create_payload = {
+        "user": user,
+        "bill_data": bill_data,
+        "bill_data_line": bill_data_line
+    }
+
+    BillService.bill_create(convert_results=bill_create_payload)

@@ -10,7 +10,7 @@ from core.schema import OpenIMISMutation
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import WorkerVoucherService, validate_acquire_unassigned_vouchers, \
-    validate_acquire_assigned_vouchers, validate_assign_vouchers
+    validate_acquire_assigned_vouchers, validate_assign_vouchers, create_assigned_voucher, create_voucher_bill
 
 
 class CreateWorkerVoucherInput(OpenIMISMutation.Input):
@@ -185,26 +185,17 @@ class AcquireAssignedVouchersMutation(BaseMutation):
         if not validate_result.get("success", False):
             return validate_result
 
-        expiry_period = WorkerVoucherConfig.voucher_expiry_period
-
-        service = WorkerVoucherService(user)
+        policyholder_id = validate_result.get("data").get("policyholder").id
         voucher_ids = []
         with transaction.atomic():
             for date in validate_result.get("data").get("dates"):
                 for insuree in validate_result.get("data").get("insurees"):
-                    service_result = service.create({
-                        "policyholder_id": validate_result.get("data").get("policyholder").id,
-                        "insuree_id": insuree.id,
-                        "code": str(uuid4()),
-                        "assigned_date": date,
-                        "expiry_date": datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
-                    })
-                    if service_result.get("success", True):
-                        voucher_ids.append(service_result.get("data").get("id"))
-                    else:
-                        raise Exception(service_result["error"])
+                    voucher_ids.append(create_assigned_voucher(user, date, insuree, policyholder_id))
 
-        # TODO integrate with mPay and send payment request
+            if not voucher_ids:
+                raise ValidationError("worker_voucher.validation.no_vouchers_created")
+
+            create_voucher_bill(user, voucher_ids, policyholder_id)
         return None
 
     class Input(AcquireAssignedVouchersMutationInput):
