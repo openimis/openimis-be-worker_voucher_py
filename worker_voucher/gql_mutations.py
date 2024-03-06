@@ -190,8 +190,7 @@ class AcquireAssignedVouchersMutation(BaseMutation):
         with transaction.atomic():
             for date in validate_result.get("data").get("dates"):
                 for insuree in validate_result.get("data").get("insurees"):
-                    voucher_ids.append(create_assigned_voucher(user, date, insuree, policyholder_id))
-
+                    voucher_ids.append(create_assigned_voucher(user, date, insuree.id, policyholder_id))
             if not voucher_ids:
                 raise ValidationError("worker_voucher.validation.no_vouchers_created")
 
