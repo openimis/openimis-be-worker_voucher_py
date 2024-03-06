@@ -3,7 +3,8 @@ from decimal import Decimal
 from typing import Iterable, Dict, Union, List
 from uuid import uuid4
 
-from django.db.models import Q
+from django.db.models import Q, QuerySet, UUIDField
+from django.db.models.functions import Cast
 from django.utils.translation import gettext as _
 
 from core import datetime
@@ -211,12 +212,12 @@ def _check_unassigned_vouchers(ph, dates, count):
     return unassigned_vouchers
 
 
-def create_assigned_voucher(user, date, insuree, policyholder_id):
+def create_assigned_voucher(user, date, insuree_id, policyholder_id):
     expiry_period = WorkerVoucherConfig.voucher_expiry_period
     voucher_service = WorkerVoucherService(user)
     service_result = voucher_service.create({
         "policyholder_id": policyholder_id,
-        "insuree_id": insuree.id,
+        "insuree_id": insuree_id,
         "code": str(uuid4()),
         "assigned_date": date,
         "expiry_date": datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
@@ -253,3 +254,16 @@ def create_voucher_bill(user, voucher_ids, policyholder_id):
     }
 
     BillService.bill_create(convert_results=bill_create_payload)
+
+
+def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:
+    user_policyholders = PolicyHolder.objects.filter(
+        policyholderuser__user=user,
+        policyholderuser__is_deleted=False,
+        policyholderuser__user__validity_to__isnull=True,
+        policyholderuser__user__i_user__validity_to__isnull=True,
+        is_deleted=False
+    ).values_list('id', flat=True)
+
+    return qs.annotate(subject_uuid=Cast('subject_id', UUIDField())) \
+        .filter(subject_uuid__in=user_policyholders)
