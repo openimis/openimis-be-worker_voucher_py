@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Iterable, Dict, Union, List
 from uuid import uuid4
 
+from django.db import transaction
 from django.db.models import Q, QuerySet, UUIDField
 from django.db.models.functions import Cast
 from django.utils.translation import gettext as _
@@ -238,22 +239,28 @@ def create_voucher_bill(user, voucher_ids, policyholder_id):
 
     bill_data_line = []
 
-    for voucher_id in voucher_ids:
-        bill_data_line.append({
-            "code": str(uuid4()),
-            "line_type": "workervoucher",
-            "line_id": voucher_id,
-            "amount_net": Decimal(WorkerVoucherConfig.price_per_voucher),
-            "amount_total": Decimal(WorkerVoucherConfig.price_per_voucher),
-        })
+    with transaction.atomic():
+        for voucher_id in voucher_ids:
+            voucher = WorkerVoucher.objects.get(id=voucher_id)
+            price = Decimal(WorkerVoucherConfig.price_per_voucher)
+            bill_data_line.append({
+                "code": str(uuid4()),
+                "description": f"Voucher {voucher.code}",
+                "line_type": "workervoucher",
+                "line_id": voucher_id,
+                "quantity": 1,
+                "unit_price": price,
+                "amount_net": price,
+                "amount_total": price,
+            })
 
-    bill_create_payload = {
-        "user": user,
-        "bill_data": bill_data,
-        "bill_data_line": bill_data_line
-    }
+        bill_create_payload = {
+            "user": user,
+            "bill_data": bill_data,
+            "bill_data_line": bill_data_line
+        }
 
-    BillService.bill_create(convert_results=bill_create_payload)
+        BillService.bill_create(convert_results=bill_create_payload)
 
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:
