@@ -264,6 +264,9 @@ def create_voucher_bill(user, voucher_ids, policyholder_id):
 
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:
+    if user.is_imis_admin:
+        return qs
+
     user_policyholders = PolicyHolder.objects.filter(
         policyholderuser__user=user,
         policyholderuser__is_deleted=False,
