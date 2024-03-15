@@ -263,17 +263,27 @@ def create_voucher_bill(user, voucher_ids, policyholder_id):
         BillService.bill_create(convert_results=bill_create_payload)
 
 
+def policyholder_user_filter(user: User, prefix='') -> Q:
+    if user.is_imis_admin:
+        return Q()
+
+    filters = {
+        f'{prefix}policyholderuser__user': user,
+        f'{prefix}policyholderuser__is_deleted': False,
+        f'{prefix}policyholderuser__user__validity_to__isnull': True,
+        f'{prefix}policyholderuser__user__i_user__validity_to__isnull': True,
+        f'{prefix}is_deleted': False
+    }
+
+    return Q(**filters)
+
+
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:
     if user.is_imis_admin:
         return qs
 
     user_policyholders = PolicyHolder.objects.filter(
-        policyholderuser__user=user,
-        policyholderuser__is_deleted=False,
-        policyholderuser__user__validity_to__isnull=True,
-        policyholderuser__user__i_user__validity_to__isnull=True,
-        is_deleted=False
-    ).values_list('id', flat=True)
+        policyholder_user_filter(user)).values_list('id', flat=True)
 
     return qs.annotate(subject_uuid=Cast('subject_id', UUIDField())) \
         .filter(subject_uuid__in=user_policyholders)
