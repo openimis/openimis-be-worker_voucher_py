@@ -18,7 +18,7 @@ from worker_voucher.gql_mutations import CreateWorkerVoucherMutation, UpdateWork
     DateRangeInclusiveInputType, AssignVouchersMutation
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import get_voucher_worker_enquire_filters, validate_acquire_unassigned_vouchers, \
-    validate_acquire_assigned_vouchers, validate_assign_vouchers
+    validate_acquire_assigned_vouchers, validate_assign_vouchers, policyholder_user_filter
 
 
 class Query(ExportableQueryMixin, graphene.ObjectType):
@@ -69,7 +69,8 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         if client_mutation_id:
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
-        query = WorkerVoucher.objects.filter(*filters)
+        query = (WorkerVoucher.objects.filter(policyholder_user_filter(info.context.user, prefix='policyholder__'))
+                 .filter(*filters))
         return gql_optimizer.query(query, info)
 
     def resolve_previous_workers(self, info, economic_unit_code=None, **kwargs):
