@@ -200,7 +200,7 @@ class AcquireAssignedVouchersMutation(BaseMutation):
                 client_mutation_id=client_mutation_id,
                 client_mutation_label=client_mutation_label)
 
-            mutation.json_ext = {'worker_voucher': {'bill_id': bill.uuid}}
+            mutation.json_ext = {'worker_voucher': {'bill_id': bill['data']['uuid']}}
             mutation.save()
         return None
 
