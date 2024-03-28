@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from core import datetime
 from core.gql.gql_mutations.base_mutation import BaseMutation
+from core.models import MutationLog
 from core.schema import OpenIMISMutation
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
@@ -178,8 +179,8 @@ class AcquireAssignedVouchersMutation(BaseMutation):
 
     @classmethod
     def _mutate(cls, user, count=None, economic_unit_code=None, workers=None, date_ranges=None, **data):
-        data.pop('client_mutation_id', None)
-        data.pop('client_mutation_label', None)
+        client_mutation_id = data.pop('client_mutation_id', None)
+        client_mutation_label = data.pop('client_mutation_label', None)
 
         validate_result = validate_acquire_assigned_vouchers(user, economic_unit_code, workers, date_ranges)
         if not validate_result.get("success", False):
@@ -194,7 +195,13 @@ class AcquireAssignedVouchersMutation(BaseMutation):
             if not voucher_ids:
                 raise ValidationError("worker_voucher.validation.no_vouchers_created")
 
-            create_voucher_bill(user, voucher_ids, policyholder_id)
+            bill = create_voucher_bill(user, voucher_ids, policyholder_id)
+            mutation = MutationLog.objects.get(
+                client_mutation_id=client_mutation_id,
+                client_mutation_label=client_mutation_label)
+
+            mutation.json_ext = {'worker_voucher': {'bill_id': bill.uuid}}
+            mutation.save()
         return None
 
     class Input(AcquireAssignedVouchersMutationInput):

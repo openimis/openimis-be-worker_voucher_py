@@ -260,7 +260,7 @@ def create_voucher_bill(user, voucher_ids, policyholder_id):
             "bill_data_line": bill_data_line
         }
 
-        BillService.bill_create(convert_results=bill_create_payload)
+        return BillService.bill_create(convert_results=bill_create_payload)
 
 
 def policyholder_user_filter(user: User, prefix='') -> Q:
