@@ -234,7 +234,8 @@ def create_voucher_bill(user, voucher_ids, policyholder_id):
         'subject_type': "policyholder",
         'subject_id': policyholder_id,
         'code': str(uuid4()),
-        'status': Bill.Status.VALIDATED
+        'status': Bill.Status.VALIDATED,
+        'due_date': datetime.datetime.now() + datetime.datetimedelta(days=14),
     }
 
     bill_data_line = []
