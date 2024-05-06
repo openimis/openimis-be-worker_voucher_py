@@ -69,8 +69,10 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         if client_mutation_id:
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
-        query = (WorkerVoucher.objects.filter(policyholder_user_filter(info.context.user, prefix='policyholder__'))
-                 .filter(*filters))
+        query = WorkerVoucher.objects.filter(*filters)
+        if not info.context.user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
+            query = query.filter(policyholder_user_filter(info.context.user, prefix='policyholder__'))
+
         return gql_optimizer.query(query, info)
 
     def resolve_previous_workers(self, info, economic_unit_code=None, **kwargs):
