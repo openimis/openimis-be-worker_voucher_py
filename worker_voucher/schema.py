@@ -34,7 +34,8 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
     previous_workers = OrderedDjangoFilterConnectionField(
         InsureeGQLType,
         orderBy=graphene.List(of_type=graphene.String),
-        economic_unit_code=graphene.String(required=True)
+        economic_unit_code=graphene.String(required=True),
+        date_range=DateRangeInclusiveInputType(required=False)
     )
 
     enquire_worker = OrderedDjangoFilterConnectionField(
@@ -73,7 +74,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
                  .filter(*filters))
         return gql_optimizer.query(query, info)
 
-    def resolve_previous_workers(self, info, economic_unit_code=None, **kwargs):
+    def resolve_previous_workers(self, info, economic_unit_code=None, date_range=None, **kwargs):
         Query._check_permissions(info.context.user, InsureeConfig.gql_query_insuree_perms)
         filters = append_validity_filter(**kwargs)
 
@@ -85,6 +86,11 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
             workervoucher__policyholder__is_deleted=False,
             workervoucher__policyholder__code=economic_unit_code
         )
+
+        if date_range:
+            start_date, end_date = date_range.get("start_date"), date_range.get("end_date")
+            query = query.filter(workervoucher__assigned_date__in=(start_date, end_date))
+
         return gql_optimizer.query(query, info)
 
     def resolve_enquire_worker(self, info, national_id=None, **kwargs):
