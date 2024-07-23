@@ -14,7 +14,10 @@ DEFAULT_CONFIG = {
     "unassigned_voucher_enabled": False,
     "price_per_voucher": "100.00",
     "max_generic_vouchers": 1000,
-    #  This filed should be a valid datetimedelata input
+    #  This fileds should be a valid datetimedelata input
+    "voucher_bill_due_period": {
+        "days": 14
+    },
     "voucher_expiry_period": {
         "months": 1
     }
@@ -37,6 +40,7 @@ class WorkerVoucherConfig(AppConfig, ConfigUtilMixin):
     unassigned_voucher_enabled = None
     price_per_voucher = None
     max_generic_vouchers = None
+    voucher_bill_due_period = None
     voucher_expiry_period = None
 
     def ready(self):

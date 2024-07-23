@@ -230,11 +230,14 @@ def create_assigned_voucher(user, date, insuree_id, policyholder_id):
 
 
 def create_voucher_bill(user, voucher_ids, policyholder_id):
+    bill_due_period = WorkerVoucherConfig.voucher_bill_due_period
+
     bill_data = {
         'subject_type': "policyholder",
         'subject_id': policyholder_id,
         'code': str(uuid4()),
-        'status': Bill.Status.VALIDATED
+        'status': Bill.Status.VALIDATED,
+        'due_date': datetime.datetime.now() + datetime.datetimedelta(**bill_due_period)
     }
 
     bill_data_line = []
