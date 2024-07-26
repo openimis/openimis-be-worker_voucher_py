@@ -11,7 +11,8 @@ from core.schema import OpenIMISMutation
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import WorkerVoucherService, validate_acquire_unassigned_vouchers, \
-    validate_acquire_assigned_vouchers, validate_assign_vouchers, create_assigned_voucher, create_voucher_bill
+    validate_acquire_assigned_vouchers, validate_assign_vouchers, create_assigned_voucher, create_voucher_bill, \
+    create_unassigned_voucher, assign_voucher
 
 
 class CreateWorkerVoucherInput(OpenIMISMutation.Input):
@@ -123,31 +124,21 @@ class AcquireUnassignedVouchersMutation(BaseMutation):
 
     @classmethod
     def _mutate(cls, user, count=None, economic_unit_code=None, **data):
-        data.pop('client_mutation_id', None)
-        data.pop('client_mutation_label', None)
+        client_mutation_id = data.pop('client_mutation_id', None)
+        client_mutation_label = data.pop('client_mutation_label', None)
 
         validate_result = validate_acquire_unassigned_vouchers(user, economic_unit_code, count)
         if not validate_result.get("success", False):
             return validate_result
 
-        expiry_period = WorkerVoucherConfig.voucher_expiry_period
 
-        service = WorkerVoucherService(user)
+        policyholder_id = validate_result.get("data").get("policyholder").id
         voucher_ids = []
         with transaction.atomic():
             for _ in range(validate_result.get("data").get("count")):
-                service_result = service.create({
-                    "policyholder_id": validate_result.get("data").get("policyholder").id,
-                    "code": str(uuid4()),
-                    "expiry_date": datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
+                voucher_ids.append(create_unassigned_voucher(user, policyholder_id))
 
-                })
-        if service_result.get("success", False):
-            voucher_ids.append(service_result.get("data").get("id"))
-        else:
-            raise Exception(service_result["error"])
-
-        # TODO integrate with mPay and send payment request
+            bill = create_voucher_bill(user, voucher_ids, policyholder_id)
         return None
 
     class Input(OpenIMISMutation.Input):
@@ -237,25 +228,13 @@ class AssignVouchersMutation(BaseMutation):
         if not validate_result.get("success", False):
             return validate_result
 
-        service = WorkerVoucherService(user)
         voucher_ids = []
         vouchers = validate_result.get("data").get("unassigned_vouchers")
         with transaction.atomic():
             for date in validate_result.get("data").get("dates"):
                 for insuree in validate_result.get("data").get("insurees"):
                     voucher = vouchers.pop(0)
-                    service_result = service.update({
-                        "id": voucher.id,
-                        "insuree_id": insuree.id,
-                        "assigned_date": date,
-                        "status": WorkerVoucher.Status.ASSIGNED,
-                    })
-                    if service_result.get("success", True):
-                        voucher_ids.append(service_result.get("data").get("id"))
-                    else:
-                        raise Exception(service_result["error"])
-
-        # TODO integrate with mPay and send payment request
+                    voucher_ids.append(assign_voucher(user, insuree.id, voucher.id, date))
         return None
 
     class Input(AssignVouchersMutationInput):

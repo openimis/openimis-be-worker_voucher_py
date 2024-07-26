@@ -229,6 +229,35 @@ def create_assigned_voucher(user, date, insuree_id, policyholder_id):
         raise VoucherException(service_result["error"])
 
 
+def create_unassigned_voucher(user, policyholder_id):
+    expiry_period = WorkerVoucherConfig.voucher_expiry_period
+    voucher_service = WorkerVoucherService(user)
+    service_result = voucher_service.create({
+        "policyholder_id": policyholder_id,
+        "code": str(uuid4()),
+        "expiry_date": datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
+    })
+    if service_result.get("success", False):
+        return service_result.get("data").get("id")
+    else:
+        raise VoucherException(service_result["error"])
+
+
+def assign_voucher(user, insuree_id, voucher_id, assigned_date):
+    # This service function does not check if the voucher is eligible to be assigned
+    voucher_service = WorkerVoucherService(user)
+    service_result = voucher_service.update({
+        "id": voucher_id,
+        "insuree_id": insuree_id,
+        "assigned_date": assigned_date,
+        "status": WorkerVoucher.Status.ASSIGNED
+    })
+    if service_result.get("success", True):
+        service_result.get("data").get("id")
+    else:
+        raise VoucherException(service_result["error"])
+
+
 def create_voucher_bill(user, voucher_ids, policyholder_id):
     bill_due_period = WorkerVoucherConfig.voucher_bill_due_period
 
@@ -237,7 +266,7 @@ def create_voucher_bill(user, voucher_ids, policyholder_id):
         'subject_id': policyholder_id,
         'code': str(uuid4()),
         'status': Bill.Status.VALIDATED,
-        'due_date': datetime.datetime.now() + datetime.datetimedelta(**bill_due_period)
+        'date_due': datetime.datetime.now() + datetime.datetimedelta(**bill_due_period)
     }
 
     bill_data_line = []
