@@ -7,12 +7,12 @@ from django.contrib.auth.models import AnonymousUser
 
 from core.gql.export_mixin import ExportableQueryMixin
 from core.schema import OrderedDjangoFilterConnectionField
-from core.utils import append_validity_filter
+from core.utils import append_validity_filter, filter_validity
 from insuree.apps import InsureeConfig
 from insuree.gql_queries import InsureeGQLType
 from insuree.models import Insuree
 from worker_voucher.apps import WorkerVoucherConfig
-from worker_voucher.gql_queries import WorkerVoucherGQLType, AcquireVouchersValidationSummaryGQLType
+from worker_voucher.gql_queries import WorkerVoucherGQLType, AcquireVouchersValidationSummaryGQLType, WorkerGQLType
 from worker_voucher.gql_mutations import CreateWorkerVoucherMutation, UpdateWorkerVoucherMutation, \
     DeleteWorkerVoucherMutation, AcquireUnassignedVouchersMutation, AcquireAssignedVouchersMutation, \
     DateRangeInclusiveInputType, AssignVouchersMutation
@@ -24,6 +24,12 @@ from worker_voucher.services import get_voucher_worker_enquire_filters, validate
 class Query(ExportableQueryMixin, graphene.ObjectType):
     exportable_fields = ['worker_voucher']
     module_name = "worker_voucher"
+
+    worker = OrderedDjangoFilterConnectionField(
+        WorkerGQLType,
+        orderBy=graphene.List(of_type=graphene.String),
+        client_mutation_id=graphene.String(),
+    )
 
     worker_voucher = OrderedDjangoFilterConnectionField(
         WorkerVoucherGQLType,
@@ -62,6 +68,15 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         workers=graphene.List(graphene.ID),
         date_ranges=graphene.List(DateRangeInclusiveInputType)
     )
+
+    def resolve_worker(self, info, client_mutation_id=None, **kwargs):
+        Query._check_permissions(info.context.user, InsureeConfig.gql_query_insurees_perms)
+        filters = filter_validity(**kwargs)
+
+        if client_mutation_id:
+            filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
+
+        return gql_optimizer.query(Insuree.objects.filter(*filters), info)
 
     def resolve_worker_voucher(self, info, client_mutation_id=None, **kwargs):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_search_perms)

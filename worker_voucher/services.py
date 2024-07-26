@@ -212,6 +212,13 @@ def _check_unassigned_vouchers(ph, dates, count):
         raise VoucherException(_(f"Not enough unassigned vouchers"))
     return unassigned_vouchers
 
+def get_worker_yearly_voucher_count(insuree_id):
+    return WorkerVoucher.objects.filter(
+        is_deleted=False,
+        status__in=(WorkerVoucher.Status.ASSIGNED, WorkerVoucher.Status.AWAITING_PAYMENT),
+        insuree_id=insuree_id,
+        assigned_date__year=datetime.datetime.now().year
+    ).count()
 
 def create_assigned_voucher(user, date, insuree_id, policyholder_id):
     expiry_period = WorkerVoucherConfig.voucher_expiry_period

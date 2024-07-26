@@ -1,11 +1,45 @@
 import graphene
-
 from graphene_django import DjangoObjectType
-from core import ExtendedConnection, prefix_filterset
-from insuree.gql_queries import InsureeGQLType
+
+from core import datetime, ExtendedConnection, prefix_filterset
+from insuree.gql_queries import InsureeGQLType, PhotoGQLType, GenderGQLType
+from insuree.models import Insuree
 from invoice.models import Bill
 from policyholder.gql import PolicyHolderGQLType
 from worker_voucher.models import WorkerVoucher
+from worker_voucher.services import get_worker_yearly_voucher_count
+
+
+class WorkerGQLType(InsureeGQLType):
+    vouchers_this_year = graphene.Int()
+
+    def resolve_vouchers_this_year(self, info):
+        return get_worker_yearly_voucher_count(self.id)
+
+    class Meta:
+        model = Insuree
+        filter_fields = {
+            "uuid": ["exact", "iexact"],
+            "chf_id": ["exact", "istartswith", "icontains", "iexact"],
+            "last_name": ["exact", "istartswith", "icontains", "iexact"],
+            "other_names": ["exact", "istartswith", "icontains", "iexact"],
+            "email": ["exact", "istartswith", "icontains", "iexact", "isnull"],
+            "phone": ["exact", "istartswith", "icontains", "iexact", "isnull"],
+            "dob": ["exact", "lt", "lte", "gt", "gte", "isnull"],
+            "head": ["exact"],
+            "passport": ["exact", "istartswith", "icontains", "iexact", "isnull"],
+            "gender__code": ["exact", "isnull"],
+            "marital": ["exact", "isnull"],
+            "status": ["exact"],
+            "validity_from": ["exact", "lt", "lte", "gt", "gte", "isnull"],
+            "validity_to": ["exact", "lt", "lte", "gt", "gte", "isnull"],
+            **prefix_filterset("photo__", PhotoGQLType._meta.filter_fields),
+            "photo": ["isnull"],
+            "family": ["isnull"],
+            **prefix_filterset("gender__", GenderGQLType._meta.filter_fields)
+        }
+        interfaces = (graphene.relay.Node,)
+        connection_class = ExtendedConnection
 
 
 class WorkerVoucherGQLType(DjangoObjectType):
