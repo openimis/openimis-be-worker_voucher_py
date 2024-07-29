@@ -100,10 +100,13 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
         price_per_voucher = Decimal(WorkerVoucherConfig.price_per_voucher)
         ph = _check_ph(user, eu_code)
         insurees = _check_insurees(workers)
+        insurees_count = len(insurees)
         dates = _check_dates(date_ranges)
+        vouchers_per_insuree_count = len(dates)
         _check_existing_active_vouchers(ph, insurees, dates)
-
-        count = len(insurees) * len(dates)
+        for insuree in insurees:
+            _check_voucher_limit(insuree, vouchers_per_insuree_count)
+        count = insurees_count * vouchers_per_insuree_count
         return {
             "success": True,
             "data": {
@@ -121,12 +124,15 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
 
 def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_ranges: List[Dict]):
     try:
-        price_per_voucher = Decimal(WorkerVoucherConfig.price_per_voucher)
         ph = _check_ph(user, eu_code)
         insurees = _check_insurees(workers)
+        insurees_count = len(insurees)
         dates = _check_dates(date_ranges)
+        vouchers_per_insuree_count = len(dates)
+        for insuree in insurees:
+            _check_voucher_limit(insuree, vouchers_per_insuree_count)
         _check_existing_active_vouchers(ph, insurees, dates)
-        count = len(insurees) * len(dates)
+        count = insurees_count * vouchers_per_insuree_count
         unassigned_vouchers = _check_unassigned_vouchers(ph, dates, count)
         return {
             "success": True,
@@ -166,6 +172,11 @@ def _check_insurees(workers: List[str]):
     if not insurees:
         raise VoucherException(_("No valid workers"))
     return insurees
+
+
+def _check_voucher_limit(insuree, count=1):
+    if get_worker_yearly_voucher_count(insuree.id) + count > WorkerVoucherConfig.yearly_worker_voucher_limit:
+        raise VoucherException(_(f"Worker {insuree.chf_id} reached yearly voucher limit"))
 
 
 def _check_dates(date_ranges: List[Dict]):
@@ -212,6 +223,7 @@ def _check_unassigned_vouchers(ph, dates, count):
         raise VoucherException(_(f"Not enough unassigned vouchers"))
     return unassigned_vouchers
 
+
 def get_worker_yearly_voucher_count(insuree_id):
     return WorkerVoucher.objects.filter(
         is_deleted=False,
@@ -219,6 +231,7 @@ def get_worker_yearly_voucher_count(insuree_id):
         insuree_id=insuree_id,
         assigned_date__year=datetime.datetime.now().year
     ).count()
+
 
 def create_assigned_voucher(user, date, insuree_id, policyholder_id):
     expiry_period = WorkerVoucherConfig.voucher_expiry_period
