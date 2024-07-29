@@ -139,6 +139,13 @@ class AcquireUnassignedVouchersMutation(BaseMutation):
                 voucher_ids.append(create_unassigned_voucher(user, policyholder_id))
 
             bill = create_voucher_bill(user, voucher_ids, policyholder_id)
+
+            mutation = MutationLog.objects.get(
+                client_mutation_id=client_mutation_id,
+                client_mutation_label=client_mutation_label)
+
+            mutation.json_ext = {'worker_voucher': {'bill_id': bill['data']['uuid']}}
+            mutation.save()
         return None
 
     class Input(OpenIMISMutation.Input):
