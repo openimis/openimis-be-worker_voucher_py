@@ -54,7 +54,7 @@ mutation createWorker {
     otherNames: "%s",
     genderId: "%s",
     dob: "%s",
-    policyHolderCode: "%s",
+    economicUnitCode: "%s",
     clientMutationId: "%s"
   }) {
     clientMutationId
