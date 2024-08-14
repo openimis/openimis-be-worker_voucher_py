@@ -29,7 +29,7 @@ class GQLCreateWorkerTestCase(TestCase):
 
         role_employer = Role.objects.get(name='Employer', validity_to__isnull=True)
 
-        cls.user = create_test_interactive_user(username='VoucherTestUser2', roles=[role_employer.id])
+        cls.user = create_test_interactive_user(username='VoucherTestUser2', roles=[role_employer.id, 9])
         cls.policyholder = create_test_policy_holder()
         cls.chf_id = '2003040034114'
         cls.last_name = 'Test'
@@ -58,9 +58,9 @@ class GQLCreateWorkerTestCase(TestCase):
         )
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
+        mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
+        self.assertFalse(mutation_log.error)
         workers = Insuree.objects.filter(chf_id=self.chf_id)
-        print(workers)
         phi = PolicyHolderInsuree.objects.filter(policy_holder=self.policyholder)
-        print(phi)
         self.assertEquals(workers.count(), 1)
         self.assertEquls(phi.count(), 1)
