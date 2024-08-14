@@ -15,7 +15,7 @@ from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.gql_queries import WorkerVoucherGQLType, AcquireVouchersValidationSummaryGQLType, WorkerGQLType
 from worker_voucher.gql_mutations import CreateWorkerVoucherMutation, UpdateWorkerVoucherMutation, \
     DeleteWorkerVoucherMutation, AcquireUnassignedVouchersMutation, AcquireAssignedVouchersMutation, \
-    DateRangeInclusiveInputType, AssignVouchersMutation
+    DateRangeInclusiveInputType, AssignVouchersMutation, CreateWorkerMutation
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import get_voucher_worker_enquire_filters, validate_acquire_unassigned_vouchers, \
     validate_acquire_assigned_vouchers, validate_assign_vouchers, policyholder_user_filter
@@ -178,6 +178,8 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
 
 class Mutation(graphene.ObjectType):
+    create_worker = CreateWorkerMutation.Field()
+
     create_worker_voucher = CreateWorkerVoucherMutation.Field()
     update_worker_voucher = UpdateWorkerVoucherMutation.Field()
     delete_worker_voucher = DeleteWorkerVoucherMutation.Field()

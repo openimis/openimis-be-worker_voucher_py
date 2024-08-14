@@ -45,3 +45,19 @@ mutation assignVouchers {
   }
 }
 """
+
+gql_mutation_create_worker = """
+mutation createWorker {
+  createWorker(input: {
+    chfId: "%s"
+    lastName: "%s",
+    otherNames: "%s",
+    genderId: "%s",
+    dob: "%s",
+    policyHolderCode: "%s",
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""
