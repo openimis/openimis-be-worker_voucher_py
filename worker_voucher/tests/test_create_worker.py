@@ -28,7 +28,7 @@ class GQLCreateWorkerTestCase(TestCase):
         super(GQLCreateWorkerTestCase, cls).setUpClass()
         cls.user = create_test_interactive_user(username='VoucherTestUser2')
         cls.policyholder = create_test_policy_holder()
-        cls.chf_id = '12343456234'
+        cls.chf_id = '4455667788'
         cls.last_name = 'Test'
         cls.other_names = 'Test'
         cls.gender_id = 'M'
