@@ -8,6 +8,10 @@ from core import datetime
 from core.gql.gql_mutations.base_mutation import BaseMutation
 from core.models import MutationLog
 from core.schema import OpenIMISMutation
+from insuree.gql_mutations import CreateInsureeMutation, CreateInsureeInputType
+from insuree.models import Insuree
+from policyholder.models import PolicyHolder
+from policyholder.services import PolicyHolderInsuree as PolicyHolderInsureeService
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import WorkerVoucherService, validate_acquire_unassigned_vouchers, \
@@ -23,6 +27,34 @@ class CreateWorkerVoucherInput(OpenIMISMutation.Input):
     insuree_id = graphene.Int(required=True)
     policyholder_id = graphene.ID(required=True)
     json_ext = graphene.types.json.JSONString(required=False)
+
+
+class CreateWorkerMutation(CreateInsureeMutation):
+    """
+    Create a new insuree
+    """
+    _mutation_module = "worker_voucher"
+    _mutation_class = "CreateWorkerMutation"
+
+    class Input(CreateInsureeInputType):
+        policy_holder_code = graphene.String(required=True)
+
+    @classmethod
+    def async_mutate(cls, user, **data):
+        policy_holder_code = data.pop('policy_holder_code', None)
+        if policy_holder_code:
+            super().async_mutate(user, **data)
+            chf_id = data.get('chf_id', None)
+            worker = Insuree.objects.get(chf_id=chf_id)
+            policy_holder_insuree_service = PolicyHolderInsureeService(user)
+            policy_holder = PolicyHolder.objects.get(code=policy_holder_code, is_deleted=False)
+            policy_holder_insuree = {
+                'policy_holder_id': f'{policy_holder.id}',
+                'insuree_id': worker.id,
+                'contribution_plan_bundle_id': None,
+            }
+            policy_holder_insuree_service.create(policy_holder_insuree)
+        return None
 
 
 class UpdateWorkerVoucherInput(CreateWorkerVoucherInput):
