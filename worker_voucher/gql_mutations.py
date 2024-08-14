@@ -10,7 +10,7 @@ from core.models import MutationLog
 from core.schema import OpenIMISMutation
 from insuree.gql_mutations import CreateInsureeMutation, CreateInsureeInputType
 from insuree.models import Insuree
-from policyholder.models import PolicyHolder
+from policyholder.models import PolicyHolder, PolicyHolderInsuree
 from policyholder.services import PolicyHolderInsuree as PolicyHolderInsureeService
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
@@ -42,18 +42,26 @@ class CreateWorkerMutation(CreateInsureeMutation):
     @classmethod
     def async_mutate(cls, user, **data):
         economic_unit_code = data.pop('economic_unit_code', None)
+        chf_id = data.get('chf_id', None)
+        phi = PolicyHolderInsuree.objects.filter(
+            insuree__chf_id=chf_id,
+            policy_holder__code=economic_unit_code,
+            is_deleted=False,
+        ).first()
         if economic_unit_code:
-            super().async_mutate(user, **data)
-            chf_id = data.get('chf_id', None)
-            worker = Insuree.objects.get(chf_id=chf_id)
-            policy_holder_insuree_service = PolicyHolderInsureeService(user)
-            policy_holder = PolicyHolder.objects.get(code=economic_unit_code, is_deleted=False)
-            policy_holder_insuree = {
-                'policy_holder_id': f'{policy_holder.id}',
-                'insuree_id': worker.id,
-                'contribution_plan_bundle_id': None,
-            }
-            policy_holder_insuree_service.create(policy_holder_insuree)
+            if not phi:
+                super().async_mutate(user, **data)
+                worker = Insuree.objects.filter(chf_id=chf_id).first()
+                policy_holder_insuree_service = PolicyHolderInsureeService(user)
+                policy_holder = PolicyHolder.objects.get(code=economic_unit_code, is_deleted=False)
+                policy_holder_insuree = {
+                    'policy_holder_id': f'{policy_holder.id}',
+                    'insuree_id': worker.id,
+                    'contribution_plan_bundle_id': None,
+                }
+                policy_holder_insuree_service.create(policy_holder_insuree)
+            else:
+                raise ValidationError("mutation.worker_already_assigned_to_unit")
         return None
 
 

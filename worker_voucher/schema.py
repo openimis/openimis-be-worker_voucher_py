@@ -82,7 +82,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
                 Q(policyholderinsuree__policy_holder__code=policy_holder_code)
             )
 
-        return gql_optimizer.query(Insuree.objects.filter(*filters), info)
+        return gql_optimizer.query(Insuree.objects.filter(*filters).distinct(), info)
 
     def resolve_worker_voucher(self, info, client_mutation_id=None, **kwargs):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_search_perms)
