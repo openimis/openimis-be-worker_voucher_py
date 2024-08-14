@@ -59,6 +59,8 @@ class GQLCreateWorkerTestCase(TestCase):
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
         workers = Insuree.objects.filter(chf_id=self.chf_id)
+        print(workers)
         phi = PolicyHolderInsuree.objects.filter(policy_holder=self.policyholder)
+        print(phi)
         self.assertEquals(workers.count(), 1)
         self.assertEquls(phi.count(), 1)
