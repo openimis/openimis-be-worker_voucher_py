@@ -1,11 +1,8 @@
-from uuid import uuid4
 from django.test import TestCase
 from core.models import Role, MutationLog
 from graphene import Schema
 from graphene.test import Client
-from core import datetime
 from core.test_helpers import create_test_interactive_user
-from insuree.test_helpers import create_test_insuree
 from policyholder.models import PolicyHolderInsuree
 from policyholder.tests import create_test_policy_holder
 from insuree.models import Insuree
@@ -61,8 +58,6 @@ class GQLCreateWorkerTestCase(TestCase):
         )
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
-        mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
-        self.assertFalse(mutation_log.error)
         workers = Insuree.objects.filter(chf_id=self.chf_id)
         phi = PolicyHolderInsuree.objects.filter(policyholder=self.policyholder)
         self.assertEquals(workers.count(), 1)

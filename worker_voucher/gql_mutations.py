@@ -278,6 +278,3 @@ class AssignVouchersMutation(BaseMutation):
 
     class Input(AssignVouchersMutationInput):
         pass
-
-
-
