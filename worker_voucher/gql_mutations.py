@@ -31,23 +31,23 @@ class CreateWorkerVoucherInput(OpenIMISMutation.Input):
 
 class CreateWorkerMutation(CreateInsureeMutation):
     """
-    Create a new insuree
+    Create a new worker
     """
     _mutation_module = "worker_voucher"
     _mutation_class = "CreateWorkerMutation"
 
     class Input(CreateInsureeInputType):
-        policy_holder_code = graphene.String(required=True)
+        economic_unit_code = graphene.String(required=True)
 
     @classmethod
     def async_mutate(cls, user, **data):
-        policy_holder_code = data.pop('policy_holder_code', None)
-        if policy_holder_code:
+        economic_unit_code = data.pop('economic_unit_code', None)
+        if economic_unit_code:
             super().async_mutate(user, **data)
             chf_id = data.get('chf_id', None)
             worker = Insuree.objects.get(chf_id=chf_id)
             policy_holder_insuree_service = PolicyHolderInsureeService(user)
-            policy_holder = PolicyHolder.objects.get(code=policy_holder_code, is_deleted=False)
+            policy_holder = PolicyHolder.objects.get(code=economic_unit_code, is_deleted=False)
             policy_holder_insuree = {
                 'policy_holder_id': f'{policy_holder.id}',
                 'insuree_id': worker.id,
