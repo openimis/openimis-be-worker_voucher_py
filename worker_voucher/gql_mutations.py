@@ -43,6 +43,12 @@ class CreateWorkerMutation(CreateInsureeMutation):
     def async_mutate(cls, user, **data):
         economic_unit_code = data.pop('economic_unit_code', None)
         chf_id = data.get('chf_id', None)
+        ph = PolicyHolder.objects.filter(
+            code=economic_unit_code,
+            is_deleted=False,
+        ).first()
+        if not ph:
+            raise ValidationError("mutation.economic_unit_not_exist")
         phi = PolicyHolderInsuree.objects.filter(
             insuree__chf_id=chf_id,
             policy_holder__code=economic_unit_code,
