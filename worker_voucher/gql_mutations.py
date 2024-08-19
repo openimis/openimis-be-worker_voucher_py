@@ -1,5 +1,6 @@
 import graphene as graphene
 from django.db import transaction
+from django.utils.translation import gettext as _
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from uuid import uuid4
@@ -16,7 +17,7 @@ from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import WorkerVoucherService, validate_acquire_unassigned_vouchers, \
     validate_acquire_assigned_vouchers, validate_assign_vouchers, create_assigned_voucher, create_voucher_bill, \
-    create_unassigned_voucher, assign_voucher
+    create_unassigned_voucher, assign_voucher, policyholder_user_filter
 
 
 class CreateWorkerVoucherInput(OpenIMISMutation.Input):
@@ -41,6 +42,8 @@ class CreateWorkerMutation(CreateInsureeMutation):
 
     @classmethod
     def async_mutate(cls, user, **data):
+        user_policyholders = PolicyHolder.objects.filter(
+            policyholder_user_filter(user)).values_list('id', flat=True)
         economic_unit_code = data.pop('economic_unit_code', None)
         chf_id = data.get('chf_id', None)
         ph = PolicyHolder.objects.filter(
@@ -48,26 +51,38 @@ class CreateWorkerMutation(CreateInsureeMutation):
             is_deleted=False,
         ).first()
         if not ph:
-            raise ValidationError("mutation.economic_unit_not_exist")
-        phi = PolicyHolderInsuree.objects.filter(
-            insuree__chf_id=chf_id,
-            policy_holder__code=economic_unit_code,
-            is_deleted=False,
-        ).first()
-        if economic_unit_code:
-            if not phi:
-                super().async_mutate(user, **data)
-                worker = Insuree.objects.filter(chf_id=chf_id).first()
-                policy_holder_insuree_service = PolicyHolderInsureeService(user)
-                policy_holder = PolicyHolder.objects.get(code=economic_unit_code, is_deleted=False)
-                policy_holder_insuree = {
-                    'policy_holder_id': f'{policy_holder.id}',
-                    'insuree_id': worker.id,
-                    'contribution_plan_bundle_id': None,
+            return [{"message": _("workers.validation.economic_unit_not_exist")}]
+        if ph.id not in user_policyholders:
+            return [
+                {
+                    "message": _("workers.validation.no_authority_to_use_selected_economic_unit")
                 }
-                policy_holder_insuree_service.create(policy_holder_insuree)
+            ]
+        if economic_unit_code:
+            phi = PolicyHolderInsuree.objects.filter(
+                insuree__chf_id=chf_id,
+                policy_holder__code=economic_unit_code,
+                is_deleted=False,
+            ).first()
+            if not phi:
+                result = None
+                worker = Insuree.objects.filter(chf_id=chf_id).first()
+                if not worker:
+                    result = super().async_mutate(user, **data)
+                if not result:
+                    worker = Insuree.objects.filter(chf_id=chf_id).first()
+                    policy_holder_insuree_service = PolicyHolderInsureeService(user)
+                    policy_holder = PolicyHolder.objects.get(code=economic_unit_code, is_deleted=False)
+                    policy_holder_insuree = {
+                        'policy_holder_id': f'{policy_holder.id}',
+                        'insuree_id': worker.id,
+                        'contribution_plan_bundle_id': None,
+                    }
+                    policy_holder_insuree_service.create(policy_holder_insuree)
+                else:
+                    return result
             else:
-                raise ValidationError("mutation.worker_already_assigned_to_unit")
+                return [{"message": _("workers.validation.worker_already_assigned_to_unit")}]
         return None
 
 
