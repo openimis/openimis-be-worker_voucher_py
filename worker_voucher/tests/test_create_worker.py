@@ -106,7 +106,7 @@ class GQLCreateWorkerTestCase(TestCase):
         mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
         self.assertTrue(mutation_log.error)
         workers = Insuree.objects.filter(chf_id=national_id)
-        self.assertEquals(workers, None)
+        self.assertEquals(workers.count(), 0)
 
     def test_create_worker_already_assigned_to_economic_unit(self):
         InsureeConfig.reset_validation_settings()
