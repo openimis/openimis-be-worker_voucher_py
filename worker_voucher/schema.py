@@ -95,7 +95,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
                  .filter(*filters))
         return gql_optimizer.query(query, info)
 
-    def resolve_previous_workers(self, info, economic_unit_code=None, date_range=None, policy_holder_code=None, **kwargs):
+    def resolve_previous_workers(self, info, economic_unit_code=None, date_range=None, **kwargs):
         Query._check_permissions(info.context.user, InsureeConfig.gql_query_insuree_perms)
         filters = append_validity_filter(**kwargs)
 
