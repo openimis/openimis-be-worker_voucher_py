@@ -78,9 +78,12 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
         if policy_holder_code:
-            filters.append(
-                Q(policyholderinsuree__policy_holder__code=policy_holder_code)
-            )
+            workers_filters = [
+                Q(policyholderinsuree__policy_holder__code=policy_holder_code),
+                Q(policyholderinsuree__policy_holder__is_deleted=False),
+                Q(policyholderinsuree__is_deleted=False),
+            ]
+            filters += workers_filters
 
         return gql_optimizer.query(Insuree.objects.filter(*filters).distinct(), info)
 
@@ -106,7 +109,9 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
             workervoucher__is_deleted=False,
             workervoucher__policyholder__is_deleted=False,
             workervoucher__policyholder__code=economic_unit_code,
-            policyholderinsuree__policy_holder__code=economic_unit_code
+            policyholderinsuree__policy_holder__code=economic_unit_code,
+            policyholderinsuree__is_deleted=False,
+            policyholderinsuree__policy_holder__is_deleted=False,
         )
 
         if date_range:
