@@ -22,7 +22,7 @@ from worker_voucher.services import get_voucher_worker_enquire_filters, validate
 
 
 class Query(ExportableQueryMixin, graphene.ObjectType):
-    exportable_fields = ['worker_voucher']
+    exportable_fields = ['worker_voucher', 'worker']
     module_name = "worker_voucher"
 
     worker = OrderedDjangoFilterConnectionField(
