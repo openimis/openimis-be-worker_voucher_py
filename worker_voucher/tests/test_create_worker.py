@@ -6,6 +6,8 @@ from core.test_helpers import create_test_interactive_user
 from policyholder.models import PolicyHolderInsuree
 from policyholder.tests import create_test_policy_holder
 from insuree.models import Insuree
+from insuree.test_helpers import generate_random_insuree_number
+from insuree.app import InsureeConfig
 from worker_voucher.schema import Query, Mutation
 from worker_voucher.tests.data.gql_payloads import gql_mutation_create_worker
 
@@ -28,7 +30,7 @@ class GQLCreateWorkerTestCase(TestCase):
         super(GQLCreateWorkerTestCase, cls).setUpClass()
         cls.user = create_test_interactive_user(username='VoucherTestUser2')
         cls.policyholder = create_test_policy_holder()
-        cls.chf_id = '4455667788'
+        cls.chf_id = F"{generate_random_insuree_number()}"
         cls.last_name = 'Test'
         cls.other_names = 'Test'
         cls.gender_id = 'M'
@@ -43,6 +45,7 @@ class GQLCreateWorkerTestCase(TestCase):
         cls.gql_context = cls.GQLContext(cls.user)
 
     def test_create_worker_success(self):
+        InsureeConfig.reset_validation_settings()
         mutation_id = "39g453h5g92h04gh34"
         payload = gql_mutation_create_worker % (
             self.chf_id,
