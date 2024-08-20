@@ -7,7 +7,7 @@ from policyholder.models import PolicyHolderInsuree
 from policyholder.tests import create_test_policy_holder
 from insuree.models import Insuree
 from insuree.test_helpers import generate_random_insuree_number
-from insuree.app import InsureeConfig
+from insuree.apps import InsureeConfig
 from worker_voucher.schema import Query, Mutation
 from worker_voucher.tests.data.gql_payloads import gql_mutation_create_worker
 
