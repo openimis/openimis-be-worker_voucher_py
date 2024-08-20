@@ -69,7 +69,7 @@ class GQLCreateWorkerTestCase(TestCase):
 
     def test_create_existing_worker_success(self):
         InsureeConfig.reset_validation_settings()
-        mutation_id = "39g453h5g92h04gh34"
+        mutation_id = "39g453h5g92h04gh35"
         payload = gql_mutation_create_worker % (
             self.existing_worker.chf_id,
             self.last_name,
@@ -90,7 +90,7 @@ class GQLCreateWorkerTestCase(TestCase):
 
     def test_create_worker_false_not_existing_economic_unit(self):
         InsureeConfig.reset_validation_settings()
-        mutation_id = "39g453h5g92h04gh34"
+        mutation_id = "39g453h5g92h04gh36"
         national_id = F"{generate_random_insuree_number()}"
         payload = gql_mutation_create_worker % (
             national_id,
@@ -110,7 +110,7 @@ class GQLCreateWorkerTestCase(TestCase):
 
     def test_create_worker_already_assigned_to_economic_unit(self):
         InsureeConfig.reset_validation_settings()
-        mutation_id = "39g453h5g92h04gh34"
+        mutation_id = "39g453h5g92h04gh37"
         national_id = F"{generate_random_insuree_number()}"
         payload = gql_mutation_create_worker % (
             national_id,
