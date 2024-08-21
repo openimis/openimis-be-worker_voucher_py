@@ -42,6 +42,9 @@ class CreateWorkerMutation(CreateInsureeMutation):
 
     @classmethod
     def async_mutate(cls, user, **data):
+        if (not user.is_imis_admin
+                and user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms)):
+            return [{"message": _("workers.user_with_that_permission_cannot_create_worker")}]
         user_policyholders = PolicyHolder.objects.filter(
             policyholder_user_filter(user)).values_list('id', flat=True)
         economic_unit_code = data.pop('economic_unit_code', None)
