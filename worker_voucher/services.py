@@ -316,7 +316,7 @@ def create_voucher_bill(user, voucher_ids, policyholder_id):
 
 
 def policyholder_user_filter(user: User, prefix='') -> Q:
-    if user.is_imis_admin:
+    if user.is_imis_admin or user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
         return Q()
 
     filters = {
