@@ -9,8 +9,7 @@ from insuree.models import Insuree
 from worker_voucher.schema import Query, Mutation
 from worker_voucher.services import policyholder_user_filter
 from worker_voucher.tests.data.gql_payloads import gql_mutation_worker_delete
-from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_user_and_eu, create_test_worker, \
-    generate_idnp
+from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_user_and_eu
 
 
 class GQLWorkerDeleteTestCase(TestCase):
