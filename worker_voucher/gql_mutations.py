@@ -9,6 +9,7 @@ from core import datetime
 from core.gql.gql_mutations.base_mutation import BaseMutation
 from core.models import MutationLog
 from core.schema import OpenIMISMutation
+from insuree.apps import InsureeConfig
 from insuree.gql_mutations import CreateInsureeMutation, CreateInsureeInputType
 from insuree.models import Insuree
 from policyholder.models import PolicyHolder, PolicyHolderInsuree
@@ -18,16 +19,6 @@ from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import WorkerVoucherService, validate_acquire_unassigned_vouchers, \
     validate_acquire_assigned_vouchers, validate_assign_vouchers, create_assigned_voucher, create_voucher_bill, \
     create_unassigned_voucher, assign_voucher, policyholder_user_filter
-
-
-class CreateWorkerVoucherInput(OpenIMISMutation.Input):
-    code = graphene.String(max_length=255, required=True)
-    status = graphene.String(max_length=255, required=False)
-    assigned_date = graphene.Date(required=True)
-    expiry_date = graphene.Date(required=True)
-    insuree_id = graphene.Int(required=True)
-    policyholder_id = graphene.ID(required=True)
-    json_ext = graphene.types.json.JSONString(required=False)
 
 
 class CreateWorkerMutation(CreateInsureeMutation):
@@ -84,6 +75,76 @@ class CreateWorkerMutation(CreateInsureeMutation):
             else:
                 return [{"message": _("workers.validation.worker_already_assigned_to_unit")}]
         return None
+
+
+class DeleteWorkerMutation(BaseMutation):
+    """
+    Create a new worker
+    """
+    _mutation_module = "worker_voucher"
+    _mutation_class = "DeleteWorkerMutation"
+
+    class Input(OpenIMISMutation.Input):
+        uuid = graphene.String(required=False)
+        uuids = graphene.List(graphene.String, required=False)
+        economic_unit_code = graphene.String(required=True)
+
+    @classmethod
+    def _validate_mutation(cls, user, **data):
+        if type(user) is AnonymousUser or not user.id or not user.has_perms(
+                InsureeConfig.gql_mutation_delete_insurees_perms):
+            raise ValidationError("mutation.authentication_required")
+
+    @classmethod
+    def _mutate(cls, user, uuid=None, uuids=None, economic_unit_code=None, **data):
+        uuids_to_delete = [uuid] if uuid else uuids
+        if not uuids_to_delete:
+            return [{"message": _("workers.validation.no_workers_to_delete")}]
+
+        eu_uuid = (PolicyHolder.objects
+                   .filter(policyholder_user_filter(user), code=economic_unit_code)
+                   .values_list('uuid', flat=True)
+                   .first())
+
+        if not eu_uuid:
+            return [{"message": _("worker_voucher.validation.economic_unit_not_exists")}]
+
+        errors = []
+        try:
+            with transaction.atomic():
+                for worker_uuid in uuids_to_delete:
+                    errors += cls._delete_worker_for_eu(user, worker_uuid, eu_uuid)
+                    if errors:
+                        raise ValidationError("Errors during mutation")
+        except ValidationError:
+            pass
+
+        return errors
+
+    @classmethod
+    def _delete_worker_for_eu(cls, user, worker_uuid, eu_uuid):
+        phi = PolicyHolderInsuree.objects.filter(
+            insuree__uuid=worker_uuid,
+            insuree__validity_to__isnull=True,
+            policy_holder__uuid=eu_uuid,
+            policy_holder__is_deleted=False
+        ).first()
+
+        if not phi:
+            return [{"message": _("worker_voucher.validation.worker_not_exists"), "detail": worker_uuid}]
+
+        phi.delete(user=user)
+        return []
+
+
+class CreateWorkerVoucherInput(OpenIMISMutation.Input):
+    code = graphene.String(max_length=255, required=True)
+    status = graphene.String(max_length=255, required=False)
+    assigned_date = graphene.Date(required=True)
+    expiry_date = graphene.Date(required=True)
+    insuree_id = graphene.Int(required=True)
+    policyholder_id = graphene.ID(required=True)
+    json_ext = graphene.types.json.JSONString(required=False)
 
 
 class UpdateWorkerVoucherInput(CreateWorkerVoucherInput):
@@ -191,7 +252,6 @@ class AcquireUnassignedVouchersMutation(BaseMutation):
         validate_result = validate_acquire_unassigned_vouchers(user, economic_unit_code, count)
         if not validate_result.get("success", False):
             return validate_result
-
 
         policyholder_id = validate_result.get("data").get("policyholder").id
         voucher_ids = []
