@@ -61,3 +61,15 @@ mutation createWorker {
   }
 }
 """
+
+gql_mutation_worker_delete = """
+mutation deleteWorker {
+  deleteWorker(input: {
+    uuid: "%s"
+    economicUnitCode: "%s"
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""

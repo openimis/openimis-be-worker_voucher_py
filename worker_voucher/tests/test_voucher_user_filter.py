@@ -4,20 +4,18 @@ from core import datetime
 from core.models import Role
 
 from core.test_helpers import create_test_interactive_user
-from insuree.test_helpers import create_test_insuree
-from policyholder.models import PolicyHolderUser
-from policyholder.tests import create_test_policy_holder
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import get_voucher_user_filters
+from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_user_and_eu
 
 
 class VoucherUserTestCase(TestCase):
     user = None
     user2 = None
     user_admin = None
-    insuree = None
-    policyholder = None
-    policyholder2 = None
+    worker = None
+    eu = None
+    eu2 = None
 
     today = None,
     yesterday = None,
@@ -35,14 +33,11 @@ class VoucherUserTestCase(TestCase):
         cls.user = create_test_interactive_user(username='VoucherTestUser1', roles=[role_employer.id])
         cls.user2 = create_test_interactive_user(username='VoucherTestUser2', roles=[role_employer.id])
         cls.user_admin = create_test_interactive_user(username='VoucherTestUserAdmin', roles=[role_admin.id])
-        cls.insuree = create_test_insuree(with_family=False)
-        cls.policyholder = create_test_policy_holder()
-        cls.policyholder2 = create_test_policy_holder()
 
-        policyholderuser = PolicyHolderUser(user=cls.user, policy_holder=cls.policyholder)
-        policyholderuser.save(username=cls.user.username)
-        policyholderuser = PolicyHolderUser(user=cls.user2, policy_holder=cls.policyholder2)
-        policyholderuser.save(username=cls.user2.username)
+        cls.eu = create_test_eu_for_user(cls.user)
+        cls.eu2 = create_test_eu_for_user(cls.user2)
+
+        cls.worker = create_test_worker_for_user_and_eu(cls.user, cls.eu)
 
         cls.today = datetime.datetime.now()
         cls.tomorrow = datetime.datetime.now() + datetime.datetimedelta(days=1)
@@ -66,8 +61,8 @@ class VoucherUserTestCase(TestCase):
     def _create_test_voucher(self, code="001", policyholder=None, status=WorkerVoucher.Status.ASSIGNED,
                              assigned_date=None, expiry_date=None):
         voucher = WorkerVoucher(
-            insuree=self.insuree,
-            policyholder=self.policyholder if not policyholder else policyholder,
+            insuree=self.worker,
+            policyholder=self.eu if not policyholder else policyholder,
             code=code,
             status=status,
             assigned_date=self.today if not assigned_date else assigned_date,

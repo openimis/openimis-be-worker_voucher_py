@@ -1,38 +1,41 @@
 from django.test import TestCase
-from core.models import Role, MutationLog
+from core.models import MutationLog, Role
 from graphene import Schema
 from graphene.test import Client
 from core.test_helpers import create_test_interactive_user
 from policyholder.models import PolicyHolderInsuree
-from policyholder.tests import create_test_policy_holder
 from insuree.models import Insuree
-from insuree.test_helpers import create_test_insuree, generate_random_insuree_number
+from insuree.test_helpers import generate_random_insuree_number
 from insuree.apps import InsureeConfig
 from worker_voucher.schema import Query, Mutation
 from worker_voucher.tests.data.gql_payloads import gql_mutation_create_worker
+from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker
 
 
-class GQLCreateWorkerTestCase(TestCase):
+class GQLWorkerCreateTestCase(TestCase):
     class GQLContext:
         def __init__(self, user):
             self.user = user
 
     user = None
-    policyholder = None
+    eu = None
+
     chf_id = None
     last_name = None
     other_names = None
     gender_id = None
     dob = None
+
     existing_worker = None
 
     @classmethod
     def setUpClass(cls):
-        super(GQLCreateWorkerTestCase, cls).setUpClass()
-        cls.user = create_test_interactive_user(username='VoucherTestUser2')
-        cls.policyholder = create_test_policy_holder()
+        super(GQLWorkerCreateTestCase, cls).setUpClass()
+        role_employer = Role.objects.get(name='Employer', validity_to__isnull=True)
+        cls.user = create_test_interactive_user(username='VoucherTestUser1', roles=[role_employer.id])
+        cls.eu = create_test_eu_for_user(cls.user)
         cls.chf_id = F"{generate_random_insuree_number()}"
-        cls.existing_worker = create_test_insuree(with_family=False)
+        cls.existing_worker = create_test_worker(cls.user, chf_id=F"{generate_random_insuree_number()}")
         cls.last_name = 'Test'
         cls.other_names = 'Test'
         cls.gender_id = 'M'
@@ -55,7 +58,7 @@ class GQLCreateWorkerTestCase(TestCase):
             self.other_names,
             self.gender_id,
             self.dob,
-            self.policyholder.code,
+            self.eu.code,
             mutation_id
         )
 
@@ -63,7 +66,7 @@ class GQLCreateWorkerTestCase(TestCase):
         mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
         self.assertFalse(mutation_log.error)
         workers = Insuree.objects.filter(chf_id=self.chf_id)
-        phi = PolicyHolderInsuree.objects.filter(policy_holder=self.policyholder)
+        phi = PolicyHolderInsuree.objects.filter(policy_holder=self.eu)
         self.assertEquals(workers.count(), 1)
         self.assertEquals(phi.count(), 1)
 
@@ -76,7 +79,7 @@ class GQLCreateWorkerTestCase(TestCase):
             self.other_names,
             self.gender_id,
             self.dob,
-            self.policyholder.code,
+            self.eu.code,
             mutation_id
         )
 
@@ -84,7 +87,7 @@ class GQLCreateWorkerTestCase(TestCase):
         mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
         self.assertFalse(mutation_log.error)
         workers = Insuree.objects.filter(chf_id=self.existing_worker.chf_id)
-        phi = PolicyHolderInsuree.objects.filter(policy_holder=self.policyholder)
+        phi = PolicyHolderInsuree.objects.filter(policy_holder=self.eu)
         self.assertEquals(workers.count(), 1)
         self.assertEquals(phi.count(), 1)
 
@@ -118,7 +121,7 @@ class GQLCreateWorkerTestCase(TestCase):
             self.other_names,
             self.gender_id,
             self.dob,
-            self.policyholder.code,
+            self.eu.code,
             mutation_id
         )
 
@@ -126,7 +129,7 @@ class GQLCreateWorkerTestCase(TestCase):
         mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
         self.assertFalse(mutation_log.error)
         workers = Insuree.objects.filter(chf_id=national_id)
-        phi = PolicyHolderInsuree.objects.filter(policy_holder=self.policyholder)
+        phi = PolicyHolderInsuree.objects.filter(policy_holder=self.eu)
         self.assertEquals(workers.count(), 1)
         self.assertEquals(phi.count(), 1)
         payload = gql_mutation_create_worker % (
@@ -135,7 +138,7 @@ class GQLCreateWorkerTestCase(TestCase):
             self.other_names,
             self.gender_id,
             self.dob,
-            self.policyholder.code,
+            self.eu.code,
             mutation_id
         )
         _ = self.gql_client.execute(payload, context=self.gql_context)
