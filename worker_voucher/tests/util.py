@@ -1,3 +1,5 @@
+import random
+
 from insuree.models import Insuree
 from policyholder.models import PolicyHolder, PolicyHolderUser, PolicyHolderInsuree
 
@@ -47,3 +49,19 @@ def create_test_worker_for_user_and_eu(user, eu):
     worker = create_test_worker(user)
     _ = create_test_phi(user, eu, worker)
     return worker
+
+def get_idnp_crc(idnp_first_12_digits):
+    assert len(idnp_first_12_digits) == 12
+
+    values = [7, 3, 1]
+
+    crc = 0
+    for i, c in enumerate(idnp_first_12_digits):
+        crc += int(c) * values[i % 3]
+
+    return crc % 10
+
+
+def generate_idnp():
+    idnp_first_12_digits = random.randint(200000000000, 299999999999)
+    return str(idnp_first_12_digits) + str(get_idnp_crc(str(idnp_first_12_digits)))
