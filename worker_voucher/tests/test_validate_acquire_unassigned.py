@@ -3,15 +3,14 @@ from django.test import TestCase
 from core.models import Role
 
 from core.test_helpers import create_test_interactive_user
-from policyholder.models import PolicyHolderUser
-from policyholder.tests import create_test_policy_holder
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.services import validate_acquire_unassigned_vouchers
+from worker_voucher.tests.util import create_test_eu_for_user
 
 
 class ValidateAcquireUnassignedTestCase(TestCase):
     user = None
-    policyholder = None
+    eu = None
 
     @classmethod
     def setUpClass(cls):
@@ -20,15 +19,12 @@ class ValidateAcquireUnassignedTestCase(TestCase):
         role_employer = Role.objects.get(name='Employer', validity_to__isnull=True)
 
         cls.user = create_test_interactive_user(username='VoucherTestUser1', roles=[role_employer.id])
-        cls.policyholder = create_test_policy_holder()
-
-        policyholderuser = PolicyHolderUser(user=cls.user, policy_holder=cls.policyholder)
-        policyholderuser.save(username=cls.user.username)
+        cls.eu = create_test_eu_for_user(cls.user)
 
     def test_validate_success(self):
         payload = (
             self.user,
-            self.policyholder.code,
+            self.eu.code,
             1
         )
 
@@ -40,7 +36,7 @@ class ValidateAcquireUnassignedTestCase(TestCase):
     def test_validate_count_too_low(self):
         payload = (
             self.user,
-            self.policyholder.code,
+            self.eu.code,
             0
         )
 
@@ -51,7 +47,7 @@ class ValidateAcquireUnassignedTestCase(TestCase):
     def test_validate_count_too_high(self):
         payload = (
             self.user,
-            self.policyholder.code,
+            self.eu.code,
             WorkerVoucherConfig.max_generic_vouchers + 1
         )
 

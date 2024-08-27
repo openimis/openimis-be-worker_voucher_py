@@ -5,12 +5,10 @@ from graphene.test import Client
 from core import datetime
 from core.models import Role, MutationLog
 from core.test_helpers import create_test_interactive_user
-from insuree.test_helpers import create_test_insuree
-from policyholder.models import PolicyHolderUser
-from policyholder.tests import create_test_policy_holder
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.schema import Query, Mutation
 from worker_voucher.tests.data.gql_payloads import gql_mutation_acquire_assigned
+from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_user_and_eu
 
 
 class GQLAcquireAssignedTestCase(TestCase):
@@ -19,8 +17,8 @@ class GQLAcquireAssignedTestCase(TestCase):
             self.user = user
 
     user = None
-    insuree = None
-    policyholder = None
+    eu = None
+    worker = None
 
     today = None,
     yesterday = None,
@@ -36,11 +34,8 @@ class GQLAcquireAssignedTestCase(TestCase):
         role_employer = Role.objects.get(name='Employer', validity_to__isnull=True)
 
         cls.user = create_test_interactive_user(username='VoucherTestUser1', roles=[role_employer.id])
-        cls.insuree = create_test_insuree(with_family=False)
-        cls.policyholder = create_test_policy_holder()
-
-        policyholderuser = PolicyHolderUser(user=cls.user, policy_holder=cls.policyholder)
-        policyholderuser.save(username=cls.user.username)
+        cls.eu = create_test_eu_for_user(cls.user)
+        cls.worker = create_test_worker_for_user_and_eu(cls.user, cls.eu)
 
         cls.today = datetime.date.today()
         cls.tomorrow = datetime.date.today() + datetime.datetimedelta(days=1)
@@ -57,8 +52,8 @@ class GQLAcquireAssignedTestCase(TestCase):
     def test_mutate(self):
         mutation_id = "vn839ngei4bgu"
         payload = gql_mutation_acquire_assigned % (
-            self.policyholder.code,
-            self.insuree.chf_id,
+            self.eu.code,
+            self.worker.chf_id,
             self.today,
             self.today,
             mutation_id
@@ -67,6 +62,6 @@ class GQLAcquireAssignedTestCase(TestCase):
         _ = self.gql_client.execute(payload, context=self.gql_context)
         mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
         self.assertFalse(mutation_log.error)
-        vouchers = WorkerVoucher.objects.filter(policyholder=self.policyholder, insuree=self.insuree,
+        vouchers = WorkerVoucher.objects.filter(policyholder=self.eu, insuree=self.worker,
                                                 assigned_date=self.today)
         self.assertEquals(vouchers.count(), 1)
