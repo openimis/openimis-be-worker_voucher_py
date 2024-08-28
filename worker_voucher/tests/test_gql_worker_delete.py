@@ -7,7 +7,7 @@ from graphene.test import Client
 from core.test_helpers import create_test_interactive_user
 from insuree.models import Insuree
 from worker_voucher.schema import Query, Mutation
-from worker_voucher.services import policyholder_user_filter
+from worker_voucher.services import worker_user_filter
 from worker_voucher.tests.data.gql_payloads import gql_mutation_worker_delete
 from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_user_and_eu
 
@@ -41,10 +41,7 @@ class GQLWorkerDeleteTestCase(TestCase):
         cls.gql_context2 = cls.GQLContext(cls.user2)
 
     def test_delete_worker_success(self):
-        workers_before = Insuree.objects.filter(
-            policyholder_user_filter(self.user, prefix='policyholderinsuree__policy_holder__'),
-            policyholderinsuree__is_deleted=False,
-        ).count()
+        workers_before = Insuree.objects.filter(worker_user_filter(self.user)).count()
         self.assertEquals(workers_before, 1)
 
         mutation_id = uuid4()
@@ -58,17 +55,11 @@ class GQLWorkerDeleteTestCase(TestCase):
         self.assertFalse(res.get("errors", None))
         self._assert_mutation_success(mutation_id)
 
-        workers_after = Insuree.objects.filter(
-            policyholder_user_filter(self.user, prefix='policyholderinsuree__policy_holder__'),
-            policyholderinsuree__is_deleted=False,
-        ).count()
+        workers_after = Insuree.objects.filter(worker_user_filter(self.user)).count()
         self.assertEquals(workers_after, 0)
 
     def test_delete_worker_failed_no_worker(self):
-        workers_before = Insuree.objects.filter(
-            policyholder_user_filter(self.user, prefix='policyholderinsuree__policy_holder__'),
-            policyholderinsuree__is_deleted=False,
-        ).count()
+        workers_before = Insuree.objects.filter(worker_user_filter(self.user)).count()
         self.assertEquals(workers_before, 1)
 
         mutation_id = uuid4()
@@ -82,10 +73,7 @@ class GQLWorkerDeleteTestCase(TestCase):
         self.assertFalse(res.get("errors", None))
         self._assert_mutation_failed(mutation_id)
 
-        workers_after = Insuree.objects.filter(
-            policyholder_user_filter(self.user, prefix='policyholderinsuree__policy_holder__'),
-            policyholderinsuree__is_deleted=False,
-        ).count()
+        workers_after = Insuree.objects.filter(worker_user_filter(self.user)).count()
         self.assertEquals(workers_after, 1)
 
     def _assert_mutation_success(self, mutation_id):

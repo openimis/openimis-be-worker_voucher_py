@@ -21,7 +21,8 @@ DEFAULT_CONFIG = {
     "voucher_expiry_period": {
         "months": 1
     },
-    "yearly_worker_voucher_limit": 120
+    "yearly_worker_voucher_limit": 120,
+    "validate_created_worker_online": True
 }
 
 
@@ -44,6 +45,7 @@ class WorkerVoucherConfig(AppConfig, ConfigUtilMixin):
     voucher_bill_due_period = None
     voucher_expiry_period = None
     yearly_worker_voucher_limit = None
+    validate_created_worker_online = None
 
     def ready(self):
         from core.models import ModuleConfiguration

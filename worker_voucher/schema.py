@@ -11,14 +11,18 @@ from core.utils import append_validity_filter, filter_validity
 from insuree.apps import InsureeConfig
 from insuree.gql_queries import InsureeGQLType
 from insuree.models import Insuree
+from insuree.services import custom_insuree_number_validation
+from msystems.services.mconnect_worker_service import MConnectWorkerService
+from policyholder.models import PolicyHolder
 from worker_voucher.apps import WorkerVoucherConfig
-from worker_voucher.gql_queries import WorkerVoucherGQLType, AcquireVouchersValidationSummaryGQLType, WorkerGQLType
+from worker_voucher.gql_queries import WorkerVoucherGQLType, AcquireVouchersValidationSummaryGQLType, WorkerGQLType, \
+    OnlineWorkerDataGQLType
 from worker_voucher.gql_mutations import CreateWorkerVoucherMutation, UpdateWorkerVoucherMutation, \
     DeleteWorkerVoucherMutation, AcquireUnassignedVouchersMutation, AcquireAssignedVouchersMutation, \
     DateRangeInclusiveInputType, AssignVouchersMutation, CreateWorkerMutation, DeleteWorkerMutation
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import get_voucher_worker_enquire_filters, validate_acquire_unassigned_vouchers, \
-    validate_acquire_assigned_vouchers, validate_assign_vouchers, policyholder_user_filter
+    validate_acquire_assigned_vouchers, validate_assign_vouchers, economic_unit_user_filter, worker_user_filter
 
 
 class Query(ExportableQueryMixin, graphene.ObjectType):
@@ -29,7 +33,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         WorkerGQLType,
         orderBy=graphene.List(of_type=graphene.String),
         client_mutation_id=graphene.String(),
-        policy_holder_code=graphene.String()
+        economic_unit_code=graphene.String()
     )
 
     worker_voucher = OrderedDjangoFilterConnectionField(
@@ -70,22 +74,29 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         date_ranges=graphene.List(DateRangeInclusiveInputType)
     )
 
-    def resolve_worker(self, info, client_mutation_id=None, policy_holder_code=None, **kwargs):
+    online_worker_data = graphene.Field(
+        OnlineWorkerDataGQLType,
+        national_id=graphene.String(),
+        economic_unit_code=graphene.ID(),
+    )
+
+    def resolve_worker(self, info, client_mutation_id=None, economic_unit_code=None, **kwargs):
         Query._check_permissions(info.context.user, InsureeConfig.gql_query_insurees_perms)
         filters = filter_validity(**kwargs)
 
         if client_mutation_id:
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
-        if policy_holder_code:
-            workers_filters = [
-                Q(policyholderinsuree__policy_holder__code=policy_holder_code),
-                Q(policyholderinsuree__policy_holder__is_deleted=False),
-                Q(policyholderinsuree__is_deleted=False),
-            ]
-            filters += workers_filters
+        eu = PolicyHolder.objects.filter(economic_unit_user_filter(info.context.user)).first()
+        if not eu:
+            raise AttributeError("workers.validation.economic_unit_not_exist")
 
-        return gql_optimizer.query(Insuree.objects.filter(*filters).distinct(), info)
+        query = Insuree.get_queryset(None, info.context.user).distinct('id').filter(
+            worker_user_filter(info.context.user),
+            policyholderinsuree__policy_holder__code=economic_unit_code,
+        )
+
+        return gql_optimizer.query(query.filter(*filters).distinct(), info)
 
     def resolve_worker_voucher(self, info, client_mutation_id=None, **kwargs):
         Query._check_permissions(info.context.user, WorkerVoucherConfig.gql_worker_voucher_search_perms)
@@ -94,7 +105,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         if client_mutation_id:
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
-        query = (WorkerVoucher.objects.filter(policyholder_user_filter(info.context.user, prefix='policyholder__'))
+        query = (WorkerVoucher.objects.filter(economic_unit_user_filter(info.context.user, prefix='policyholder__'))
                  .filter(*filters))
         return gql_optimizer.query(query, info)
 
@@ -102,16 +113,16 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         Query._check_permissions(info.context.user, InsureeConfig.gql_query_insuree_perms)
         filters = append_validity_filter(**kwargs)
 
-        # This query inner joins workervoucher and duplicates insuree for every voucher for some reason
-        # distinct added to fix that
+        eu = PolicyHolder.objects.filter(economic_unit_user_filter(info.context.user), code=economic_unit_code).first()
+        if not eu:
+            return [{"message": _("workers.validation.economic_unit_not_exist")}]
+
         query = Insuree.get_queryset(None, info.context.user).distinct('id').filter(
-            validity_to__isnull=True,
+            worker_user_filter(info.context.user),
             workervoucher__is_deleted=False,
             workervoucher__policyholder__is_deleted=False,
             workervoucher__policyholder__code=economic_unit_code,
             policyholderinsuree__policy_holder__code=economic_unit_code,
-            policyholderinsuree__is_deleted=False,
-            policyholderinsuree__policy_holder__is_deleted=False,
         )
 
         if date_range:
@@ -176,6 +187,27 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         validation_summary.pop("dates")
         validation_summary.pop("unassigned_vouchers")
         return AcquireVouchersValidationSummaryGQLType(**validation_summary)
+
+    def resolve_online_worker_data(self, info, national_id=None, economic_unit_code=None, **kwargs):
+        Query._check_permissions(info.context.user, InsureeConfig.gql_query_insuree_perms)
+
+        eu = PolicyHolder.objects.filter(economic_unit_user_filter(info.context.user), code=economic_unit_code).first()
+        if not eu:
+            return [{"message": _("workers.validation.economic_unit_not_exist")}]
+
+        if InsureeConfig.get_insuree_number_validator():
+            errors = custom_insuree_number_validation(national_id)
+            if errors:
+                return errors
+
+        online_result = MConnectWorkerService().fetch_worker_data(national_id, info.context.user, eu)
+        if not online_result.get("success", False):
+            raise AttributeError(online_result.get("error", _("Unknown Error")))
+
+        return OnlineWorkerDataGQLType(
+            other_names=online_result.get("data", {}).get("GivenName"),
+            last_name=online_result.get("data", {}).get("FamilyName")
+        )
 
     @staticmethod
     def _check_permissions(user, perms):
