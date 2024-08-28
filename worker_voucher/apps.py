@@ -22,7 +22,7 @@ DEFAULT_CONFIG = {
         "months": 1
     },
     "yearly_worker_voucher_limit": 120,
-    "validate_created_worker_online": True
+    "validate_created_worker_online": False
 }
 
 
