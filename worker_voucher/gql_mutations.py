@@ -49,7 +49,7 @@ class CreateWorkerMutation(CreateInsureeMutation):
                 }
             ]
         if WorkerVoucherConfig.validate_created_worker_online:
-            online_result = MConnectWorkerService().fetch_worker_data(chf_id, user, economic_unit_code)
+            online_result = MConnectWorkerService().fetch_worker_data(chf_id, user, ph)
             if not online_result.get("success", False):
                 return online_result
             else:
