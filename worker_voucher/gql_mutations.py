@@ -3,22 +3,21 @@ from django.db import transaction
 from django.utils.translation import gettext as _
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
-from uuid import uuid4
 
-from core import datetime
 from core.gql.gql_mutations.base_mutation import BaseMutation
 from core.models import MutationLog
 from core.schema import OpenIMISMutation
 from insuree.apps import InsureeConfig
 from insuree.gql_mutations import CreateInsureeMutation, CreateInsureeInputType
 from insuree.models import Insuree
+from msystems.services.mconnect_worker_service import MConnectWorkerService
 from policyholder.models import PolicyHolder, PolicyHolderInsuree
 from policyholder.services import PolicyHolderInsuree as PolicyHolderInsureeService
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import WorkerVoucherService, validate_acquire_unassigned_vouchers, \
     validate_acquire_assigned_vouchers, validate_assign_vouchers, create_assigned_voucher, create_voucher_bill, \
-    create_unassigned_voucher, assign_voucher, policyholder_user_filter
+    create_unassigned_voucher, assign_voucher, economic_unit_user_filter
 
 
 class CreateWorkerMutation(CreateInsureeMutation):
@@ -34,7 +33,7 @@ class CreateWorkerMutation(CreateInsureeMutation):
     @classmethod
     def async_mutate(cls, user, **data):
         user_policyholders = PolicyHolder.objects.filter(
-            policyholder_user_filter(user)).values_list('id', flat=True)
+            economic_unit_user_filter(user)).values_list('id', flat=True)
         economic_unit_code = data.pop('economic_unit_code', None)
         chf_id = data.get('chf_id', None)
         ph = PolicyHolder.objects.filter(
@@ -49,6 +48,14 @@ class CreateWorkerMutation(CreateInsureeMutation):
                     "message": _("workers.validation.no_authority_to_use_selected_economic_unit")
                 }
             ]
+        if WorkerVoucherConfig.validate_created_worker_online:
+            online_result = MConnectWorkerService().fetch_worker_data(chf_id, user, ph)
+            if not online_result.get("success", False):
+                return online_result
+            else:
+                data['other_names'] = online_result["data"]["GivenName"]
+                data['last_name'] = online_result["data"]["FamilyName"]
+
         if economic_unit_code:
             phi = PolicyHolderInsuree.objects.filter(
                 insuree__chf_id=chf_id,
@@ -74,7 +81,6 @@ class CreateWorkerMutation(CreateInsureeMutation):
                     return result
             else:
                 return [{"message": _("workers.validation.worker_already_assigned_to_unit")}]
-        return None
 
 
 class DeleteWorkerMutation(BaseMutation):
@@ -102,7 +108,7 @@ class DeleteWorkerMutation(BaseMutation):
             return [{"message": _("workers.validation.no_workers_to_delete")}]
 
         eu_uuid = (PolicyHolder.objects
-                   .filter(policyholder_user_filter(user), code=economic_unit_code)
+                   .filter(economic_unit_user_filter(user), code=economic_unit_code)
                    .values_list('uuid', flat=True)
                    .first())
 
@@ -115,8 +121,8 @@ class DeleteWorkerMutation(BaseMutation):
                 for worker_uuid in uuids_to_delete:
                     errors += cls._delete_worker_for_eu(user, worker_uuid, eu_uuid)
                     if errors:
-                        raise ValidationError("Errors during mutation")
-        except ValidationError:
+                        raise ValueError("Errors during mutation")
+        except ValueError:
             pass
 
         return errors
@@ -127,7 +133,8 @@ class DeleteWorkerMutation(BaseMutation):
             insuree__uuid=worker_uuid,
             insuree__validity_to__isnull=True,
             policy_holder__uuid=eu_uuid,
-            policy_holder__is_deleted=False
+            policy_holder__is_deleted=False,
+            is_deleted=False,
         ).first()
 
         if not phi:

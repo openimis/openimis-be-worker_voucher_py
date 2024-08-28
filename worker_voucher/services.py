@@ -1,5 +1,6 @@
 import logging
 from decimal import Decimal
+from sys import prefix
 from typing import Iterable, Dict, Union, List
 from uuid import uuid4
 
@@ -315,7 +316,7 @@ def create_voucher_bill(user, voucher_ids, policyholder_id):
         return BillService.bill_create(convert_results=bill_create_payload)
 
 
-def policyholder_user_filter(user: User, prefix='') -> Q:
+def economic_unit_user_filter(user: User, prefix='') -> Q:
     if user.is_imis_admin or user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
         return Q()
 
@@ -329,13 +330,24 @@ def policyholder_user_filter(user: User, prefix='') -> Q:
 
     return Q(**filters)
 
+def worker_user_filter(user: User, prefix='') -> Q:
+    if user.is_imis_admin or user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
+        return Q()
+
+    filters = {
+        f"{prefix}policyholderinsuree__is_deleted": False,
+        f'{prefix}validity_to__isnull': True
+    }
+
+    return Q(**filters) & economic_unit_user_filter(user, prefix="policyholderinsuree__policy_holder__")
+
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:
     if user.is_imis_admin:
         return qs
 
     user_policyholders = PolicyHolder.objects.filter(
-        policyholder_user_filter(user)).values_list('id', flat=True)
+        economic_unit_user_filter(user)).values_list('id', flat=True)
 
     return qs.annotate(subject_uuid=Cast('subject_id', UUIDField())) \
         .filter(subject_uuid__in=user_policyholders)

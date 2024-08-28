@@ -1,7 +1,7 @@
 import graphene
 from graphene_django import DjangoObjectType
 
-from core import datetime, ExtendedConnection, prefix_filterset
+from core import ExtendedConnection, prefix_filterset
 from insuree.gql_queries import InsureeGQLType, PhotoGQLType, GenderGQLType
 from insuree.models import Insuree
 from invoice.models import Bill
@@ -83,3 +83,8 @@ class AcquireVouchersValidationSummaryGQLType(graphene.ObjectType):
     price = graphene.Decimal()
     count = graphene.Int()
     price_per_voucher = graphene.Decimal()
+
+
+class OnlineWorkerDataGQLType(graphene.ObjectType):
+    other_names = graphene.String()
+    last_name = graphene.String()
