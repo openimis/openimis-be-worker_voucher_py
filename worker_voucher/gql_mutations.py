@@ -10,6 +10,7 @@ from core.schema import OpenIMISMutation
 from insuree.apps import InsureeConfig
 from insuree.gql_mutations import CreateInsureeMutation, CreateInsureeInputType
 from insuree.models import Insuree
+from msystems.services.mconnect_worker_service import MConnectWorkerService
 from policyholder.models import PolicyHolder, PolicyHolderInsuree
 from policyholder.services import PolicyHolderInsuree as PolicyHolderInsureeService
 from worker_voucher.apps import WorkerVoucherConfig
@@ -47,6 +48,14 @@ class CreateWorkerMutation(CreateInsureeMutation):
                     "message": _("workers.validation.no_authority_to_use_selected_economic_unit")
                 }
             ]
+        if WorkerVoucherConfig.validate_created_worker_online:
+            online_result = MConnectWorkerService().fetch_worker_data(chf_id, user, economic_unit_code)
+            if not online_result.get("success", False):
+                return online_result
+            else:
+                data['other_names'] = online_result["data"]["GivenName"]
+                data['last_name'] = online_result["data"]["FamilyName"]
+
         if economic_unit_code:
             phi = PolicyHolderInsuree.objects.filter(
                 insuree__chf_id=chf_id,
@@ -72,7 +81,6 @@ class CreateWorkerMutation(CreateInsureeMutation):
                     return result
             else:
                 return [{"message": _("workers.validation.worker_already_assigned_to_unit")}]
-        return None
 
 
 class DeleteWorkerMutation(BaseMutation):
