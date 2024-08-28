@@ -205,8 +205,8 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
             raise AttributeError(online_result.get("error", _("Unknown Error")))
 
         return OnlineWorkerDataGQLType(
-            other_names=online_result.get("data", {}).get("GivenName"),
-            last_name=online_result.get("data", {}).get("FamilyName")
+            other_names=online_result["data"]["GivenName"],
+            last_name=online_result.get["data"]["FamilyName"]
         )
 
     @staticmethod
