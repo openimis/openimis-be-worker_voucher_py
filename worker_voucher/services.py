@@ -104,7 +104,7 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
         insurees_count = len(insurees)
         dates = _check_dates(date_ranges)
         vouchers_per_insuree_count = len(dates)
-        _check_existing_active_vouchers(ph, insurees, dates)
+        check_existing_active_vouchers(ph, insurees, dates)
         for insuree in insurees:
             _check_voucher_limit(insuree, vouchers_per_insuree_count)
         count = insurees_count * vouchers_per_insuree_count
@@ -132,7 +132,7 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
         vouchers_per_insuree_count = len(dates)
         for insuree in insurees:
             _check_voucher_limit(insuree, vouchers_per_insuree_count)
-        _check_existing_active_vouchers(ph, insurees, dates)
+        check_existing_active_vouchers(ph, insurees, dates)
         count = insurees_count * vouchers_per_insuree_count
         unassigned_vouchers = _check_unassigned_vouchers(ph, dates, count)
         return {
@@ -200,13 +200,19 @@ def _check_dates(date_ranges: List[Dict]):
     return dates
 
 
-def _check_existing_active_vouchers(ph, insurees, dates):
+def check_existing_active_vouchers(ph, insurees, dates):
+    if isinstance(dates, set):
+        date_filter = {'assigned_date__in': dates}
+    else:
+        date_filter = {'assigned_date__gte': dates}
+
     if WorkerVoucher.objects.filter(
             insuree__in=insurees,
-            assigned_date__in=dates,
             policyholder=ph,
             status__in=(WorkerVoucher.Status.ASSIGNED, WorkerVoucher.Status.AWAITING_PAYMENT),
-            is_deleted=False).exists():
+            is_deleted=False,
+            **date_filter
+    ).exists():
         raise VoucherException(_("One or more workers have assigned vouchers in specified ranges"))
 
 
