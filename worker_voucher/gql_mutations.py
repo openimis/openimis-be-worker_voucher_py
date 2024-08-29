@@ -55,6 +55,7 @@ class CreateWorkerMutation(CreateInsureeMutation):
             else:
                 data['other_names'] = online_result["data"]["GivenName"]
                 data['last_name'] = online_result["data"]["FamilyName"]
+                data['photo'] = {"photo": online_result["data"]["Photo"]}
 
         if economic_unit_code:
             phi = PolicyHolderInsuree.objects.filter(

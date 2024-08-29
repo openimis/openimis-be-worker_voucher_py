@@ -206,7 +206,8 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         return OnlineWorkerDataGQLType(
             other_names=online_result["data"]["GivenName"],
-            last_name=online_result["data"]["FamilyName"]
+            last_name=online_result["data"]["FamilyName"],
+            photo=online_result["data"]["Photo"]
         )
 
     @staticmethod
