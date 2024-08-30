@@ -87,13 +87,8 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         if client_mutation_id:
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
 
-        eu = PolicyHolder.objects.filter(economic_unit_user_filter(info.context.user)).first()
-        if not eu:
-            raise AttributeError("workers.validation.economic_unit_not_exist")
-
         query = Insuree.get_queryset(None, info.context.user).distinct('id').filter(
-            worker_user_filter(info.context.user),
-            policyholderinsuree__policy_holder__code=economic_unit_code,
+            worker_user_filter(info.context.user, economic_unit_code=economic_unit_code),
         )
 
         return gql_optimizer.query(query.filter(*filters).distinct(), info)
@@ -118,11 +113,10 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
             return [{"message": _("workers.validation.economic_unit_not_exist")}]
 
         query = Insuree.get_queryset(None, info.context.user).distinct('id').filter(
-            worker_user_filter(info.context.user),
+            worker_user_filter(info.context.user, economic_unit_code=economic_unit_code),
             workervoucher__is_deleted=False,
             workervoucher__policyholder__is_deleted=False,
             workervoucher__policyholder__code=economic_unit_code,
-            policyholderinsuree__policy_holder__code=economic_unit_code,
         )
 
         if date_range:

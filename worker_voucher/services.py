@@ -1,6 +1,5 @@
 import logging
 from decimal import Decimal
-from sys import prefix
 from typing import Iterable, Dict, Union, List
 from uuid import uuid4
 
@@ -322,30 +321,45 @@ def create_voucher_bill(user, voucher_ids, policyholder_id):
         return BillService.bill_create(convert_results=bill_create_payload)
 
 
-def economic_unit_user_filter(user: User, prefix='') -> Q:
-    if user.is_imis_admin or user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
-        return Q()
-
+def economic_unit_user_filter(user: User, economic_unit_code=None, prefix='') -> Q:
     filters = {
-        f'{prefix}policyholderuser__user': user,
-        f'{prefix}policyholderuser__is_deleted': False,
-        f'{prefix}policyholderuser__user__validity_to__isnull': True,
-        f'{prefix}policyholderuser__user__i_user__validity_to__isnull': True,
         f'{prefix}is_deleted': False
     }
 
+    if not user.is_imis_admin and not user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
+        filters = {
+            **filters,
+            f'{prefix}policyholderuser__user': user,
+            f'{prefix}policyholderuser__is_deleted': False,
+            f'{prefix}policyholderuser__user__validity_to__isnull': True,
+            f'{prefix}policyholderuser__user__i_user__validity_to__isnull': True,
+            f'{prefix}is_deleted': False
+        }
+
+    if economic_unit_code:
+        filters = {
+            **filters,
+            f'{prefix}code': economic_unit_code
+        }
+
     return Q(**filters)
 
-def worker_user_filter(user: User, prefix='') -> Q:
-    if user.is_imis_admin or user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
-        return Q()
 
+def worker_user_filter(user: User, economic_unit_code=None, prefix='') -> Q:
     filters = {
-        f"{prefix}policyholderinsuree__is_deleted": False,
         f'{prefix}validity_to__isnull': True
     }
 
-    return Q(**filters) & economic_unit_user_filter(user, prefix="policyholderinsuree__policy_holder__")
+    if not user.is_imis_admin and not user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
+        filters = {
+            **filters,
+            f"{prefix}policyholderinsuree__is_deleted": False,
+        }
+        return Q(**filters) & economic_unit_user_filter(user,
+                                                        economic_unit_code=economic_unit_code,
+                                                        prefix="policyholderinsuree__policy_holder__")
+    else:
+        return Q(**filters)
 
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:
