@@ -8,7 +8,7 @@ from core.test_helpers import create_test_interactive_user
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.schema import Query, Mutation
 from worker_voucher.tests.data.gql_payloads import gql_mutation_acquire_assigned
-from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_user_and_eu
+from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_eu
 
 
 class GQLAcquireAssignedTestCase(TestCase):
@@ -35,7 +35,7 @@ class GQLAcquireAssignedTestCase(TestCase):
 
         cls.user = create_test_interactive_user(username='VoucherTestUser1', roles=[role_employer.id])
         cls.eu = create_test_eu_for_user(cls.user)
-        cls.worker = create_test_worker_for_user_and_eu(cls.user, cls.eu)
+        cls.worker = create_test_worker_for_eu(cls.user, cls.eu)
 
         cls.today = datetime.date.today()
         cls.tomorrow = datetime.date.today() + datetime.datetimedelta(days=1)

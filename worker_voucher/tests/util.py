@@ -4,9 +4,9 @@ from insuree.models import Insuree
 from policyholder.models import PolicyHolder, PolicyHolderUser, PolicyHolderInsuree
 
 
-def create_test_eu(user):
+def create_test_eu(user, code='test_eu'):
     eu = PolicyHolder(
-        code='test_eu',
+        code=code,
         trade_name='Test EU'
     )
     eu.save(user=user)
@@ -21,8 +21,8 @@ def create_test_phu(user, eu):
     return phu
 
 
-def create_test_eu_for_user(user):
-    eu = create_test_eu(user)
+def create_test_eu_for_user(user, code='test_eu'):
+    eu = create_test_eu(user, code)
     _ = create_test_phu(user, eu)
     return eu
 
@@ -45,8 +45,8 @@ def create_test_phi(user, eu, worker):
     return phi
 
 
-def create_test_worker_for_user_and_eu(user, eu):
-    worker = create_test_worker(user)
+def create_test_worker_for_eu(user, eu, chf_id="2675135421017"):
+    worker = create_test_worker(user, chf_id)
     _ = create_test_phi(user, eu, worker)
     return worker
 
