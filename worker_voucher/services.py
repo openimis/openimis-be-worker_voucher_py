@@ -359,6 +359,13 @@ def worker_user_filter(user: User, economic_unit_code=None, prefix='') -> Q:
                                                         economic_unit_code=economic_unit_code,
                                                         prefix="policyholderinsuree__policy_holder__")
     else:
+        if economic_unit_code:
+            filters = {
+                **filters,
+                f"{prefix}policyholderinsuree__is_deleted": False,
+                f"{prefix}policyholderinsuree__policy_holder__is_deleted": False,
+                f"{prefix}policyholderinsuree__policy_holder__code": economic_unit_code,
+            }
         return Q(**filters)
 
 
