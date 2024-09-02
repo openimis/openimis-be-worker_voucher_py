@@ -99,7 +99,7 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
     try:
         price_per_voucher = Decimal(WorkerVoucherConfig.price_per_voucher)
         ph = _check_ph(user, eu_code)
-        insurees = _check_insurees(workers)
+        insurees = _check_insurees(workers, eu_code, user)
         insurees_count = len(insurees)
         dates = _check_dates(date_ranges)
         vouchers_per_insuree_count = len(dates)
@@ -125,7 +125,7 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
 def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_ranges: List[Dict]):
     try:
         ph = _check_ph(user, eu_code)
-        insurees = _check_insurees(workers)
+        insurees = _check_insurees(workers, eu_code, user)
         insurees_count = len(insurees)
         dates = _check_dates(date_ranges)
         vouchers_per_insuree_count = len(dates)
@@ -152,17 +152,22 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
 
 def _check_ph(user: User, eu_code: str):
     try:
-        return PolicyHolder.objects.get(code=eu_code, is_deleted=False, policyholderuser__user=user,
-                                        policyholderuser__is_deleted=False)
+        return PolicyHolder.objects.get(
+            economic_unit_user_filter(user, economic_unit_code=eu_code)
+        )
     except PolicyHolder.DoesNotExist:
         raise VoucherException(_(f"Economic unit {eu_code} does not exists"))
 
 
-def _check_insurees(workers: List[str]):
+def _check_insurees(workers: List[str], eu_code: str, user: User):
     insurees = set()
     for code in workers:
         try:
-            ins = Insuree.objects.get(chf_id=code, validity_to__isnull=True)
+            ins = Insuree.objects.get(
+                worker_user_filter(user, economic_unit_code=eu_code),
+                chf_id=code,
+                validity_to__isnull=True,
+            )
         except Insuree.DoesNotExist:
             raise VoucherException(_(f"Worker {code} does not exists"))
         if ins in insurees:
