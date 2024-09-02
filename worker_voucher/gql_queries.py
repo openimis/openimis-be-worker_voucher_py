@@ -88,3 +88,4 @@ class AcquireVouchersValidationSummaryGQLType(graphene.ObjectType):
 class OnlineWorkerDataGQLType(graphene.ObjectType):
     other_names = graphene.String()
     last_name = graphene.String()
+    photo = graphene.String()

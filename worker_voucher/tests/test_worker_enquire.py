@@ -5,7 +5,7 @@ from core import datetime
 from core.test_helpers import create_test_interactive_user
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import get_voucher_worker_enquire_filters
-from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_user_and_eu
+from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_eu
 
 
 class WorkerEnquireTestCase(TestCase):
@@ -23,8 +23,7 @@ class WorkerEnquireTestCase(TestCase):
 
         cls.user = create_test_interactive_user()
         cls.eu = create_test_eu_for_user(cls.user)
-        cls.worker = create_test_worker_for_user_and_eu(cls.user, cls.eu)
-
+        cls.worker = create_test_worker_for_eu(cls.user, cls.eu)
 
         cls.today = datetime.datetime.now()
         cls.tomorrow = datetime.datetime.now() + datetime.datetimedelta(days=1)

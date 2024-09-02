@@ -1,6 +1,5 @@
 import logging
 from decimal import Decimal
-from sys import prefix
 from typing import Iterable, Dict, Union, List
 from uuid import uuid4
 
@@ -104,7 +103,7 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
         insurees_count = len(insurees)
         dates = _check_dates(date_ranges)
         vouchers_per_insuree_count = len(dates)
-        _check_existing_active_vouchers(ph, insurees, dates)
+        check_existing_active_vouchers(ph, insurees, dates)
         for insuree in insurees:
             _check_voucher_limit(insuree, vouchers_per_insuree_count)
         count = insurees_count * vouchers_per_insuree_count
@@ -132,7 +131,7 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
         vouchers_per_insuree_count = len(dates)
         for insuree in insurees:
             _check_voucher_limit(insuree, vouchers_per_insuree_count)
-        _check_existing_active_vouchers(ph, insurees, dates)
+        check_existing_active_vouchers(ph, insurees, dates)
         count = insurees_count * vouchers_per_insuree_count
         unassigned_vouchers = _check_unassigned_vouchers(ph, dates, count)
         return {
@@ -204,13 +203,19 @@ def _check_dates(date_ranges: List[Dict]):
     return dates
 
 
-def _check_existing_active_vouchers(ph, insurees, dates):
+def check_existing_active_vouchers(ph, insurees, dates):
+    if isinstance(dates, set):
+        date_filter = {'assigned_date__in': dates}
+    else:
+        date_filter = {'assigned_date__gte': dates}
+
     if WorkerVoucher.objects.filter(
             insuree__in=insurees,
-            assigned_date__in=dates,
             policyholder=ph,
             status__in=(WorkerVoucher.Status.ASSIGNED, WorkerVoucher.Status.AWAITING_PAYMENT),
-            is_deleted=False).exists():
+            is_deleted=False,
+            **date_filter
+    ).exists():
         raise VoucherException(_("One or more workers have assigned vouchers in specified ranges"))
 
 
@@ -320,30 +325,52 @@ def create_voucher_bill(user, voucher_ids, policyholder_id):
         return BillService.bill_create(convert_results=bill_create_payload)
 
 
-def economic_unit_user_filter(user: User, prefix='') -> Q:
-    if user.is_imis_admin or user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
-        return Q()
-
+def economic_unit_user_filter(user: User, economic_unit_code=None, prefix='') -> Q:
     filters = {
-        f'{prefix}policyholderuser__user': user,
-        f'{prefix}policyholderuser__is_deleted': False,
-        f'{prefix}policyholderuser__user__validity_to__isnull': True,
-        f'{prefix}policyholderuser__user__i_user__validity_to__isnull': True,
         f'{prefix}is_deleted': False
     }
 
+    if not user.is_imis_admin and not user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
+        filters = {
+            **filters,
+            f'{prefix}policyholderuser__user': user,
+            f'{prefix}policyholderuser__is_deleted': False,
+            f'{prefix}policyholderuser__user__validity_to__isnull': True,
+            f'{prefix}policyholderuser__user__i_user__validity_to__isnull': True,
+            f'{prefix}is_deleted': False
+        }
+
+    if economic_unit_code:
+        filters = {
+            **filters,
+            f'{prefix}code': economic_unit_code
+        }
+
     return Q(**filters)
 
-def worker_user_filter(user: User, prefix='') -> Q:
-    if user.is_imis_admin or user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
-        return Q()
 
+def worker_user_filter(user: User, economic_unit_code=None, prefix='') -> Q:
     filters = {
-        f"{prefix}policyholderinsuree__is_deleted": False,
         f'{prefix}validity_to__isnull': True
     }
 
-    return Q(**filters) & economic_unit_user_filter(user, prefix="policyholderinsuree__policy_holder__")
+    if not user.is_imis_admin and not user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms):
+        filters = {
+            **filters,
+            f"{prefix}policyholderinsuree__is_deleted": False,
+        }
+        return Q(**filters) & economic_unit_user_filter(user,
+                                                        economic_unit_code=economic_unit_code,
+                                                        prefix="policyholderinsuree__policy_holder__")
+    else:
+        if economic_unit_code:
+            filters = {
+                **filters,
+                f"{prefix}policyholderinsuree__is_deleted": False,
+                f"{prefix}policyholderinsuree__policy_holder__is_deleted": False,
+                f"{prefix}policyholderinsuree__policy_holder__code": economic_unit_code,
+            }
+        return Q(**filters)
 
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:

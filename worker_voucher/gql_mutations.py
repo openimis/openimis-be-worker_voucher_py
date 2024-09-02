@@ -4,6 +4,7 @@ from django.utils.translation import gettext as _
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 
+from core import datetime
 from core.gql.gql_mutations.base_mutation import BaseMutation
 from core.models import MutationLog
 from core.schema import OpenIMISMutation
@@ -17,7 +18,7 @@ from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.services import WorkerVoucherService, validate_acquire_unassigned_vouchers, \
     validate_acquire_assigned_vouchers, validate_assign_vouchers, create_assigned_voucher, create_voucher_bill, \
-    create_unassigned_voucher, assign_voucher, economic_unit_user_filter
+    create_unassigned_voucher, assign_voucher, economic_unit_user_filter, check_existing_active_vouchers
 
 
 class CreateWorkerMutation(CreateInsureeMutation):
@@ -55,6 +56,7 @@ class CreateWorkerMutation(CreateInsureeMutation):
             else:
                 data['other_names'] = online_result["data"]["GivenName"]
                 data['last_name'] = online_result["data"]["FamilyName"]
+                data['photo'] = {"photo": online_result["data"]["Photo"]}
 
         if economic_unit_code:
             phi = PolicyHolderInsuree.objects.filter(
@@ -139,6 +141,9 @@ class DeleteWorkerMutation(BaseMutation):
 
         if not phi:
             return [{"message": _("worker_voucher.validation.worker_not_exists"), "detail": worker_uuid}]
+
+        today = datetime.datetime.now()
+        check_existing_active_vouchers(eu_uuid, [phi.insuree.id], today)
 
         phi.delete(user=user)
         return []
