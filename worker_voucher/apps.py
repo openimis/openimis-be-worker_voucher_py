@@ -21,6 +21,8 @@ DEFAULT_CONFIG = {
     "voucher_expiry_period": {
         "months": 1
     },
+    # voucher_expiry_type = "fixed_period" or "end_of_year"
+    "voucher_expiry_type": "end_of_year",
     "yearly_worker_voucher_limit": 120,
     "validate_created_worker_online": False
 }
@@ -44,6 +46,7 @@ class WorkerVoucherConfig(AppConfig, ConfigUtilMixin):
     max_generic_vouchers = None
     voucher_bill_due_period = None
     voucher_expiry_period = None
+    voucher_expiry_type = None
     yearly_worker_voucher_limit = None
     validate_created_worker_online = None
 

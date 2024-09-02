@@ -245,6 +245,17 @@ def get_worker_yearly_voucher_count(insuree_id):
 
 
 def create_assigned_voucher(user, date, insuree_id, policyholder_id):
+    expiry_type = WorkerVoucherConfig.voucher_expiry_type
+
+    if expiry_type == "end_of_year":
+        current_date = datetime.datetime.now()
+        expiry_date = datetime.datetime(current_date.year, 12, 31, 23, 59, 59)
+    elif expiry_type == "fixed_period":
+        expiry_period = WorkerVoucherConfig.voucher_expiry_period
+        expiry_date = datetime.datetime.now() + datetime.timedelta(**expiry_period)
+    else:
+        raise ValueError(f"Unknown expiry type: {expiry_type}")
+
     expiry_period = WorkerVoucherConfig.voucher_expiry_period
     voucher_service = WorkerVoucherService(user)
     service_result = voucher_service.create({
@@ -252,7 +263,7 @@ def create_assigned_voucher(user, date, insuree_id, policyholder_id):
         "insuree_id": insuree_id,
         "code": str(uuid4()),
         "assigned_date": date,
-        "expiry_date": datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
+        "expiry_date": expiry_date
     })
     if service_result.get("success", True):
         return service_result.get("data").get("id")
@@ -261,12 +272,22 @@ def create_assigned_voucher(user, date, insuree_id, policyholder_id):
 
 
 def create_unassigned_voucher(user, policyholder_id):
-    expiry_period = WorkerVoucherConfig.voucher_expiry_period
+    expiry_type = WorkerVoucherConfig.voucher_expiry_type
+
+    if expiry_type == "end_of_year":
+        current_date = datetime.datetime.now()
+        expiry_date = datetime.datetime(current_date.year, 12, 31, 23, 59, 59)
+    elif expiry_type == "fixed_period":
+        expiry_period = WorkerVoucherConfig.voucher_expiry_period
+        expiry_date = datetime.datetime.now() + datetime.timedelta(**expiry_period)
+    else:
+        raise ValueError(f"Unknown expiry type: {expiry_type}")
+
     voucher_service = WorkerVoucherService(user)
     service_result = voucher_service.create({
         "policyholder_id": policyholder_id,
         "code": str(uuid4()),
-        "expiry_date": datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
+        "expiry_date": expiry_date
     })
     if service_result.get("success", False):
         return service_result.get("data").get("id")
