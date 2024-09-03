@@ -1,11 +1,13 @@
+from dateutils import years
 from django.test import TestCase
 
 from core import datetime
 from core.models import Role
-
 from core.test_helpers import create_test_interactive_user
-from worker_voucher.services import validate_acquire_assigned_vouchers
-from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_eu
+from worker_voucher.apps import WorkerVoucherConfig
+from worker_voucher.services import validate_acquire_assigned_vouchers, create_assigned_voucher
+from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_eu, \
+    OverrideAppConfigContextManager as override_config
 
 
 class ValidateAcquireAssignedTestCase(TestCase):
@@ -80,3 +82,51 @@ class ValidateAcquireAssignedTestCase(TestCase):
         res = validate_acquire_assigned_vouchers(*payload)
 
         self.assertFalse(res['success'])
+
+    @override_config(WorkerVoucherConfig, {"yearly_worker_voucher_limit": 3,
+                                           "voucher_expiry_type": "fixed_period",
+                                           "voucher_expiry_period": {"years": 2}})
+    def test_validate_worker_voucher_limit_reached(self):
+        voucher_limit = WorkerVoucherConfig.yearly_worker_voucher_limit
+        date_start = datetime.date(datetime.date.today().year + 1, 1, 1)
+        self._acquire_vouchers(date_start, voucher_limit)
+
+        date_test = date_start + datetime.datetimedelta(days=voucher_limit)
+
+        payload = (
+            self.user,
+            self.eu.code,
+            (self.worker.chf_id,),
+            ([{'start_date': date_test, 'end_date': date_test}])
+        )
+
+        res = validate_acquire_assigned_vouchers(*payload)
+
+        self.assertFalse(res['success'])
+
+    @override_config(WorkerVoucherConfig, {"yearly_worker_voucher_limit": 3,
+                                           "voucher_expiry_type": "fixed_period",
+                                           "voucher_expiry_period": {"years": 2}})
+    def test_validate_worker_voucher_limit_next_year(self):
+        voucher_limit = WorkerVoucherConfig.yearly_worker_voucher_limit
+        date_start = datetime.date(datetime.date.today().year + 1, 1, 1)
+        self._acquire_vouchers(date_start, voucher_limit)
+
+        date_test = date_start + datetime.datetimedelta(years=1)
+
+        payload = (
+            self.user,
+            self.eu.code,
+            (self.worker.chf_id,),
+            ([{'start_date': date_test, 'end_date': date_test}])
+        )
+
+        res = validate_acquire_assigned_vouchers(*payload)
+
+        self.assertTrue(res['success'])
+
+    def _acquire_vouchers(self, date_start, amount):
+        dates = [date_start + datetime.datetimedelta(days=i) for i in range(amount)]
+
+        for date in dates:
+            create_assigned_voucher(self.user, date, self.worker.id, self.eu.id)

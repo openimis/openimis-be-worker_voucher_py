@@ -4,7 +4,7 @@ from typing import Iterable, Dict, Union, List
 from uuid import uuid4
 
 from django.db import transaction
-from django.db.models import Q, QuerySet, UUIDField
+from django.db.models import Q, QuerySet, UUIDField, Count
 from django.db.models.functions import Cast
 from django.utils.translation import gettext as _
 
@@ -105,7 +105,10 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
         vouchers_per_insuree_count = len(dates)
         check_existing_active_vouchers(ph, insurees, dates)
         for insuree in insurees:
-            _check_voucher_limit(insuree, vouchers_per_insuree_count)
+            years = {date.year for date in dates}
+            for year in years:
+                count = sum(1 for d in dates if d.year == year)
+                _check_voucher_limit(insuree, user, ph, year, count)
         count = insurees_count * vouchers_per_insuree_count
         return {
             "success": True,
@@ -130,7 +133,7 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
         dates = _check_dates(date_ranges)
         vouchers_per_insuree_count = len(dates)
         for insuree in insurees:
-            _check_voucher_limit(insuree, vouchers_per_insuree_count)
+            _check_voucher_limit(insuree, user, ph, vouchers_per_insuree_count)
         check_existing_active_vouchers(ph, insurees, dates)
         count = insurees_count * vouchers_per_insuree_count
         unassigned_vouchers = _check_unassigned_vouchers(ph, dates, count)
@@ -179,8 +182,10 @@ def _check_insurees(workers: List[str], eu_code: str, user: User):
     return insurees
 
 
-def _check_voucher_limit(insuree, count=1):
-    if get_worker_yearly_voucher_count(insuree.id) + count > WorkerVoucherConfig.yearly_worker_voucher_limit:
+def _check_voucher_limit(insuree, user, policyholder, year, count=1):
+    voucher_counts = get_worker_yearly_voucher_count_counts(insuree, user, year)
+
+    if voucher_counts.get(policyholder.code, 0) + count > WorkerVoucherConfig.yearly_worker_voucher_limit:
         raise VoucherException(_(f"Worker {insuree.chf_id} reached yearly voucher limit"))
 
 
@@ -235,13 +240,16 @@ def _check_unassigned_vouchers(ph, dates, count):
     return unassigned_vouchers
 
 
-def get_worker_yearly_voucher_count(insuree_id):
-    return WorkerVoucher.objects.filter(
+def get_worker_yearly_voucher_count_counts(insuree: Insuree, user: User, year):
+    res = WorkerVoucher.objects.filter(
+        economic_unit_user_filter(user, prefix="policyholder__"),
         is_deleted=False,
         status__in=(WorkerVoucher.Status.ASSIGNED, WorkerVoucher.Status.AWAITING_PAYMENT),
-        insuree_id=insuree_id,
-        assigned_date__year=datetime.datetime.now().year
-    ).count()
+        insuree=insuree,
+        assigned_date__year=year
+    ).values("policyholder__code").annotate(count=Count("id"))
+
+    return {row["policyholder__code"]: row["count"] for row in res}
 
 
 def create_assigned_voucher(user, date, insuree_id, policyholder_id):
@@ -252,11 +260,10 @@ def create_assigned_voucher(user, date, insuree_id, policyholder_id):
         expiry_date = datetime.datetime(current_date.year, 12, 31, 23, 59, 59)
     elif expiry_type == "fixed_period":
         expiry_period = WorkerVoucherConfig.voucher_expiry_period
-        expiry_date = datetime.datetime.now() + datetime.timedelta(**expiry_period)
+        expiry_date = datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
     else:
         raise ValueError(f"Unknown expiry type: {expiry_type}")
 
-    expiry_period = WorkerVoucherConfig.voucher_expiry_period
     voucher_service = WorkerVoucherService(user)
     service_result = voucher_service.create({
         "policyholder_id": policyholder_id,
@@ -279,7 +286,7 @@ def create_unassigned_voucher(user, policyholder_id):
         expiry_date = datetime.datetime(current_date.year, 12, 31, 23, 59, 59)
     elif expiry_type == "fixed_period":
         expiry_period = WorkerVoucherConfig.voucher_expiry_period
-        expiry_date = datetime.datetime.now() + datetime.timedelta(**expiry_period)
+        expiry_date = datetime.datetime.now() + datetime.datetimedelta(**expiry_period)
     else:
         raise ValueError(f"Unknown expiry type: {expiry_type}")
 

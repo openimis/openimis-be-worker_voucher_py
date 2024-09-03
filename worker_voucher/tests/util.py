@@ -1,4 +1,7 @@
 import random
+from contextlib import ContextDecorator
+
+from django.apps import AppConfig
 
 from insuree.models import Insuree
 from policyholder.models import PolicyHolder, PolicyHolderUser, PolicyHolderInsuree
@@ -11,6 +14,7 @@ def create_test_eu(user, code='test_eu'):
     )
     eu.save(user=user)
     return eu
+
 
 def create_test_phu(user, eu):
     phu = PolicyHolderUser(
@@ -26,6 +30,7 @@ def create_test_eu_for_user(user, code='test_eu'):
     _ = create_test_phu(user, eu)
     return eu
 
+
 def create_test_worker(user, chf_id="2675135421017"):
     worker = Insuree(
         other_names="Test",
@@ -35,6 +40,7 @@ def create_test_worker(user, chf_id="2675135421017"):
     )
     worker.save()
     return worker
+
 
 def create_test_phi(user, eu, worker):
     phi = PolicyHolderInsuree(
@@ -49,6 +55,7 @@ def create_test_worker_for_eu(user, eu, chf_id="2675135421017"):
     worker = create_test_worker(user, chf_id)
     _ = create_test_phi(user, eu, worker)
     return worker
+
 
 def get_idnp_crc(idnp_first_12_digits):
     assert len(idnp_first_12_digits) == 12
@@ -65,3 +72,26 @@ def get_idnp_crc(idnp_first_12_digits):
 def generate_idnp():
     idnp_first_12_digits = random.randint(200000000000, 299999999999)
     return str(idnp_first_12_digits) + str(get_idnp_crc(str(idnp_first_12_digits)))
+
+
+class OverrideAppConfigContextManager(ContextDecorator):
+    """
+    Context manager/decorator for overriding default config for tests
+    """
+    config_class: AppConfig
+    temp_config: dict
+    original_config: dict
+
+    def __init__(self, config_class, config):
+        self.config_class = config_class
+        self.temp_config = config
+        self.original_config = dict()
+
+    def __enter__(self):
+        for key in self.temp_config:
+            self.original_config[key] = getattr(self.config_class, key)
+            setattr(self.config_class, key, self.temp_config[key])
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        for key in self.original_config:
+            setattr(self.config_class, key, self.original_config[key])
