@@ -133,7 +133,10 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
         dates = _check_dates(date_ranges)
         vouchers_per_insuree_count = len(dates)
         for insuree in insurees:
-            _check_voucher_limit(insuree, user, ph, vouchers_per_insuree_count)
+            years = {date.year for date in dates}
+            for year in years:
+                count = sum(1 for d in dates if d.year == year)
+                _check_voucher_limit(insuree, user, ph, year, count)
         check_existing_active_vouchers(ph, insurees, dates)
         count = insurees_count * vouchers_per_insuree_count
         unassigned_vouchers = _check_unassigned_vouchers(ph, dates, count)
