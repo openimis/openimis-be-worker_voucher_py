@@ -1,20 +1,20 @@
 import graphene
 from graphene_django import DjangoObjectType
 
-from core import ExtendedConnection, prefix_filterset
+from core import ExtendedConnection, prefix_filterset, datetime
 from insuree.gql_queries import InsureeGQLType, PhotoGQLType, GenderGQLType
 from insuree.models import Insuree
 from invoice.models import Bill
 from policyholder.gql import PolicyHolderGQLType
 from worker_voucher.models import WorkerVoucher
-from worker_voucher.services import get_worker_yearly_voucher_count
+from worker_voucher.services import get_worker_yearly_voucher_count_counts
 
 
 class WorkerGQLType(InsureeGQLType):
-    vouchers_this_year = graphene.Int()
+    vouchers_this_year = graphene.JSONString()
 
     def resolve_vouchers_this_year(self, info):
-        return get_worker_yearly_voucher_count(self.id)
+        return get_worker_yearly_voucher_count_counts(self.id, info.context.user, datetime.date.today().year)
 
     class Meta:
         model = Insuree
