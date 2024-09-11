@@ -1,5 +1,6 @@
 import random
 from contextlib import ContextDecorator
+from typing import Any, Type
 
 from django.apps import AppConfig
 
@@ -74,15 +75,15 @@ def generate_idnp():
     return str(idnp_first_12_digits) + str(get_idnp_crc(str(idnp_first_12_digits)))
 
 
-class OverrideAppConfigContextManager(ContextDecorator):
+class OverrideAppConfig(ContextDecorator):
     """
     Context manager/decorator for overriding default config for tests
     """
-    config_class: AppConfig
+    config_class: Type[AppConfig]
     temp_config: dict
     original_config: dict
 
-    def __init__(self, config_class, config):
+    def __init__(self, config_class: Type[AppConfig], config: dict[str, Any]):
         self.config_class = config_class
         self.temp_config = config
         self.original_config = dict()
