@@ -7,7 +7,7 @@ from core.test_helpers import create_test_interactive_user
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.services import validate_acquire_assigned_vouchers, create_assigned_voucher
 from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_eu, \
-    OverrideAppConfigContextManager as override_config
+    OverrideAppConfig as override_config
 
 
 class ValidateAcquireAssignedTestCase(TestCase):
@@ -82,6 +82,21 @@ class ValidateAcquireAssignedTestCase(TestCase):
         res = validate_acquire_assigned_vouchers(*payload)
 
         self.assertFalse(res['success'])
+
+    @override_config(WorkerVoucherConfig, {"voucher_expiry_type": "end_of_year"})
+    def test_validate_end_of_year(self):
+        end_of_year = datetime.date(datetime.date.today().year, 12, 31)
+
+        payload = (
+            self.user,
+            self.eu.code,
+            (self.worker.chf_id,),
+            ([{'start_date': end_of_year, 'end_date': end_of_year}])
+        )
+
+        res = validate_acquire_assigned_vouchers(*payload)
+
+        self.assertTrue(res['success'])
 
     @override_config(WorkerVoucherConfig, {"yearly_worker_voucher_limit": 3,
                                            "voucher_expiry_type": "fixed_period",
