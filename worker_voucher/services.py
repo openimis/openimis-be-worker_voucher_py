@@ -196,9 +196,15 @@ def _check_dates(date_ranges: List[Dict]):
     max_date = _get_voucher_expiry_date(datetime.date.today())
     dates = set()
     for date_range in date_ranges:
-        start_date, end_date = date_range.get("start_date"), date_range.get("end_date")
+        start_date, end_date = (datetime.date.from_ad_date(date_range.get("start_date")),
+                                datetime.date.from_ad_date(date_range.get("end_date")))
+        if start_date < datetime.date.today():
+            raise VoucherException(_(f"Date {start_date} is in the past"))
+        if start_date > end_date:
+            raise VoucherException(_(f"Start date {start_date} is after end date {end_date}"))
+
         day_count = (end_date - start_date).days + 1
-        for date in (datetime.date.from_ad_date(start_date) + datetime.datetimedelta(days=n) for n in
+        for date in (start_date + datetime.datetimedelta(days=n) for n in
                      range(day_count)):
             if date in dates:
                 raise VoucherException(_(f"Date {date} in more than one range"))

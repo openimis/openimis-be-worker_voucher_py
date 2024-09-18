@@ -1,4 +1,3 @@
-from dateutils import years
 from django.test import TestCase
 
 from core import datetime
@@ -6,8 +5,7 @@ from core.models import Role
 from core.test_helpers import create_test_interactive_user
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.services import validate_acquire_assigned_vouchers, create_assigned_voucher
-from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_eu, \
-    OverrideAppConfig as override_config
+from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker_for_eu, OverrideAppConfig
 
 
 class ValidateAcquireAssignedTestCase(TestCase):
@@ -83,7 +81,7 @@ class ValidateAcquireAssignedTestCase(TestCase):
 
         self.assertFalse(res['success'])
 
-    @override_config(WorkerVoucherConfig, {"voucher_expiry_type": "end_of_year"})
+    @OverrideAppConfig(WorkerVoucherConfig, {"voucher_expiry_type": "end_of_year"})
     def test_validate_end_of_year(self):
         end_of_year = datetime.date(datetime.date.today().year, 12, 31)
 
@@ -98,7 +96,7 @@ class ValidateAcquireAssignedTestCase(TestCase):
 
         self.assertTrue(res['success'])
 
-    @override_config(WorkerVoucherConfig, {"yearly_worker_voucher_limit": 3,
+    @OverrideAppConfig(WorkerVoucherConfig, {"yearly_worker_voucher_limit": 3,
                                            "voucher_expiry_type": "fixed_period",
                                            "voucher_expiry_period": {"years": 2}})
     def test_validate_worker_voucher_limit_reached(self):
@@ -119,7 +117,7 @@ class ValidateAcquireAssignedTestCase(TestCase):
 
         self.assertFalse(res['success'])
 
-    @override_config(WorkerVoucherConfig, {"yearly_worker_voucher_limit": 3,
+    @OverrideAppConfig(WorkerVoucherConfig, {"yearly_worker_voucher_limit": 3,
                                            "voucher_expiry_type": "fixed_period",
                                            "voucher_expiry_period": {"years": 2}})
     def test_validate_worker_voucher_limit_next_year(self):
@@ -139,6 +137,30 @@ class ValidateAcquireAssignedTestCase(TestCase):
         res = validate_acquire_assigned_vouchers(*payload)
 
         self.assertTrue(res['success'])
+
+    def test_validate_start_date_in_the_past(self):
+        payload = (
+            self.user,
+            self.eu.code,
+            (self.worker.chf_id,),
+            ([{'start_date': self.yesterday, 'end_date': self.tomorrow}])
+        )
+
+        res = validate_acquire_assigned_vouchers(*payload)
+
+        self.assertFalse(res['success'])
+
+    def test_validate_start_date_after_end_date(self):
+        payload = (
+            self.user,
+            self.eu.code,
+            (self.worker.chf_id,),
+            ([{'start_date': self.tomorrow, 'end_date': self.yesterday}])
+        )
+
+        res = validate_acquire_assigned_vouchers(*payload)
+
+        self.assertFalse(res['success'])
 
     def _acquire_vouchers(self, date_start, amount):
         dates = [date_start + datetime.datetimedelta(days=i) for i in range(amount)]
