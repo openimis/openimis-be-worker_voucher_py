@@ -22,8 +22,8 @@ class WorkerVoucher(HistoryModel):
     code = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=255, blank=True, null=True, choices=Status.choices,
                               default=Status.AWAITING_PAYMENT)
-    assigned_date = fields.DateField(blank=True, null=True)
-    expiry_date = fields.DateField(blank=True, null=True)
+    assigned_date = fields.DateTimeField(blank=True, null=True)
+    expiry_date = fields.DateTimeField(blank=True, null=True)
 
     @classmethod
     def get_queryset(cls, queryset, user):
