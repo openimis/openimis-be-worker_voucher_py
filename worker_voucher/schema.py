@@ -1,5 +1,6 @@
 import graphene
 import graphene_django_optimizer as gql_optimizer
+import pandas as pd
 
 from django.db.models import Q
 from django.utils.translation import gettext as _

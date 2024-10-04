@@ -220,10 +220,10 @@ def _get_voucher_expiry_date(start_date: datetime):
     expiry_type = WorkerVoucherConfig.voucher_expiry_type
 
     if expiry_type == "end_of_year":
-        expiry_date = datetime.date(start_date.year, 12, 31)
+        expiry_date = datetime.datetime(start_date.year, 12, 31, 23, 59, 59)
     elif expiry_type == "fixed_period":
         expiry_period = WorkerVoucherConfig.voucher_expiry_period
-        expiry_date = datetime.date.today() + datetime.datetimedelta(**expiry_period)
+        expiry_date = datetime.datetime.today() + datetime.datetimedelta(**expiry_period)
     else:
         raise VoucherException(_("Invalid voucher expiry type"))
 
@@ -274,7 +274,7 @@ def get_worker_yearly_voucher_count_counts(insuree: Insuree, user: User, year):
 
 
 def create_assigned_voucher(user, date, insuree_id, policyholder_id):
-    current_date = datetime.date.today()
+    current_date = datetime.datetime.today()
     expiry_date = _get_voucher_expiry_date(current_date)
 
     voucher_service = WorkerVoucherService(user)
