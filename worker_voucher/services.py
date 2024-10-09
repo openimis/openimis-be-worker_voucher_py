@@ -1,4 +1,5 @@
 import logging
+import pandas as pd
 from decimal import Decimal
 from typing import Iterable, Dict, Union, List
 from uuid import uuid4
@@ -405,6 +406,62 @@ def worker_user_filter(user: User, economic_unit_code=None, prefix='') -> Q:
                 f"{prefix}policyholderinsuree__policy_holder__code": economic_unit_code,
             }
         return Q(**filters)
+
+
+class WorkerUploadService:
+    def __init__(self, user: InteractiveUser):
+        self.user = user
+
+    def upload_worker(self, economic_unit_id, file, upload):
+        economic_unit = self._resolve_economic_unit(economic_unit_id)
+        upload.policyholder = economic_unit
+        upload.status = upload.Status.IN_PROGRESS
+        upload.save(username=self.user.login_name)
+        if not file:
+            raise ValueError(_('File is required'))
+        df = pd.read_csv(file)
+        self._validate_dataframe(df)
+        df.rename(columns={v: k for k, v in WorkerVoucherConfig.csv_reconciliation_field_mapping.items()}, inplace=True)
+
+        affected_rows = 0
+        skipped_items = 0
+        total_number_of_records_in_file = len(df)
+
+        df[WorkerVoucherConfig.csv_worker_upload_errors_column] = df.apply(lambda row: self._reconcile_row(payroll, row),
+                                                                      axis=1)
+
+        for _, row in df.iterrows():
+            if not pd.isna(row[PayrollConfig.csv_reconciliation_errors_column]):
+                skipped_items += 1
+            else:
+                affected_rows += 1
+
+        summary = {
+            'affected_rows': affected_rows,
+            'total_number_of_benefits_in_file': total_number_of_records_in_file,
+            'skipped_items': skipped_items
+        }
+
+        error_df = df[df[PayrollConfig.csv_reconciliation_errors_column].apply(lambda x: bool(x))]
+        if not error_df.empty:
+            in_memory_file = BytesIO()
+            df.rename(columns={k: v for k, v in PayrollConfig.csv_reconciliation_field_mapping.items()}, inplace=True)
+            df.to_csv(in_memory_file, index=False)
+            return in_memory_file, error_df.set_index(PayrollConfig.csv_reconciliation_code_column)\
+                                   [PayrollConfig.csv_reconciliation_errors_column].to_dict(), summary
+        return file, None, summary
+
+    def _validate_dataframe(self, df):
+        if df is None:
+            raise ValueError(_("Unknown error while loading import file"))
+        if df.empty:
+            raise ValueError(_("Import file is empty"))
+
+    @staticmethod
+    def get_worker_upload_payment_file_path(economic_unit_id, file_name=None):
+        if file_name:
+            return f"csv_worker_upload/economic_unit_{economic_unit_id}/{file_name}"
+        return f"csv_worker_upload/economic_unit_{economic_unit_id}"
 
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:

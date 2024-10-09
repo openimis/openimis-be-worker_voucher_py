@@ -37,3 +37,16 @@ class WorkerVoucher(HistoryModel):
                 queryset = queryset.filter(id=None)
             queryset = queryset.filter(*get_voucher_user_filters(user))
         return queryset
+
+
+class WorkerUpload(HistoryModel):
+    class Status(models.TextChoices):
+        TRIGGERED = 'TRIGGERED', _('Triggered')
+        IN_PROGRESS = 'IN_PROGRESS', _('In progress')
+        SUCCESS = 'SUCCESS', _('Success')
+        FAIL = 'FAIL', _('Fail')
+
+    policyholder = models.ForeignKey(PolicyHolder, models.DO_NOTHING, null=True, blank=True)
+    status = models.CharField(max_length=255, choices=Status.choices, default=Status.TRIGGERED)
+    error = models.JSONField(blank=True, default=dict)
+    file_name = models.CharField(max_length=255, null=True, blank=True)
