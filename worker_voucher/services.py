@@ -460,6 +460,8 @@ class WorkerUploadService:
             raise ValueError(_("Import file is empty"))
         if WorkerVoucherConfig.csv_worker_upload_errors_column in df.columns:
             raise ValueError(_("Column errors in csv."))
+        if WorkerVoucherConfig.worker_upload_chf_id_type not in df.columns:
+            raise ValueError(_("No national id column in csv file"))
 
     def _resolve_economic_unit(self, economic_unit_code):
         if not economic_unit_code:
