@@ -7,8 +7,9 @@ from rest_framework.response import Response
 from core.utils import DefaultStorageFileHandler
 from im_export.views import check_user_rights
 from worker_voucher.apps import WorkerVoucherConfig
-from worker_voucher.models import Payroll, CsvReconciliationUpload
-from worker_voucher.services import CsvReconciliationService
+from worker_voucher.models import WorkerUpload
+from policyholder.models import PolicyHolder
+from worker_voucher.services import WorkerUploadService
 
 logger = logging.getLogger(__name__)
 
@@ -18,23 +19,23 @@ class WorkerUploadAPIView(views.APIView):
 
     @transaction.atomic
     def post(self, request):
-        upload = CsvReconciliationUpload()
-        economic_unit_id = request.GET.get('economic_unit_id')
+        upload = WorkerUpload()
+        economic_unit_code = request.GET.get('economic_unit_code')
         try:
             upload.save(username=request.user.login_name)
             file = request.FILES.get('file')
-            target_file_path = WorkerVoucherConfig.get_payroll_payment_file_path(payroll_id, file.name)
+            target_file_path = WorkerVoucherConfig.get_worker_upload_payment_file_path(economic_unit_code, file.name)
             upload.file_name = file.name
             file_handler = DefaultStorageFileHandler(target_file_path)
             file_handler.check_file_path()
-            service = CsvReconciliationService(request.user)
-            file_to_upload, errors, summary = service.upload_reconciliation(payroll_id, file, upload)
+            service = WorkerUploadService(request.user)
+            file_to_upload, errors, summary = service.upload_worker(economic_unit_code, file, upload)
             if errors:
-                upload.status = CsvReconciliationUpload.Status.PARTIAL_SUCCESS
+                upload.status = WorkerUpload.Status.PARTIAL_SUCCESS
                 upload.error = errors
                 upload.json_ext = {'extra_info': summary}
             else:
-                upload.status = CsvReconciliationUpload.Status.SUCCESS
+                upload.status = WorkerUpload.Status.SUCCESS
                 upload.json_ext = {'extra_info': summary}
             upload.save(username=request.user.login_name)
             file_handler.save_file(file_to_upload)
@@ -43,8 +44,8 @@ class WorkerUploadAPIView(views.APIView):
             logger.error("Error while uploading CSV reconciliation", exc_info=exc)
             if upload:
                 upload.error = {'error': str(exc)}
-                upload.payroll = Payroll.objects.filter(id=payroll_id).first()
-                upload.status = CsvReconciliationUpload.Status.FAIL
+                upload.policyholder = PolicyHolder.objects.filter(code=economic_unit_code).first()
+                upload.status = WorkerUpload.Status.FAIL
                 summary = {
                     'affected_rows': 0,
                 }

@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+from io import BytesIO
 from decimal import Decimal
 from typing import Iterable, Dict, Union, List
 from uuid import uuid4
@@ -16,7 +17,9 @@ from core.signals import register_service_signal
 from insuree.models import Insuree
 from invoice.models import Bill
 from invoice.services import BillService
-from policyholder.models import PolicyHolder
+from policyholder.models import PolicyHolder, PolicyHolderInsuree
+from policyholder.services import PolicyHolderInsuree as PolicyHolderInsureeService
+from msystems.services.mconnect_worker_service import MConnectWorkerService
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.validation import WorkerVoucherValidation
@@ -412,8 +415,8 @@ class WorkerUploadService:
     def __init__(self, user: InteractiveUser):
         self.user = user
 
-    def upload_worker(self, economic_unit_id, file, upload):
-        economic_unit = self._resolve_economic_unit(economic_unit_id)
+    def upload_worker(self, economic_unit_code, file, upload):
+        economic_unit = self._resolve_economic_unit(economic_unit_code)
         upload.policyholder = economic_unit
         upload.status = upload.Status.IN_PROGRESS
         upload.save(username=self.user.login_name)
@@ -421,17 +424,17 @@ class WorkerUploadService:
             raise ValueError(_('File is required'))
         df = pd.read_csv(file)
         self._validate_dataframe(df)
-        df.rename(columns={v: k for k, v in WorkerVoucherConfig.csv_reconciliation_field_mapping.items()}, inplace=True)
 
         affected_rows = 0
         skipped_items = 0
         total_number_of_records_in_file = len(df)
 
-        df[WorkerVoucherConfig.csv_worker_upload_errors_column] = df.apply(lambda row: self._reconcile_row(payroll, row),
-                                                                      axis=1)
+        df[WorkerVoucherConfig.csv_worker_upload_errors_column] = (
+            df.apply(lambda row: self._upload_record_with_worker(economic_unit, row), axis=1)
+        )
 
         for _, row in df.iterrows():
-            if not pd.isna(row[PayrollConfig.csv_reconciliation_errors_column]):
+            if not pd.isna(row[WorkerVoucherConfig.csv_worker_upload_errors_column]):
                 skipped_items += 1
             else:
                 affected_rows += 1
@@ -442,13 +445,12 @@ class WorkerUploadService:
             'skipped_items': skipped_items
         }
 
-        error_df = df[df[PayrollConfig.csv_reconciliation_errors_column].apply(lambda x: bool(x))]
+        error_df = df[df[WorkerVoucherConfig.csv_worker_upload_errors_column].apply(lambda x: bool(x))]
         if not error_df.empty:
             in_memory_file = BytesIO()
-            df.rename(columns={k: v for k, v in PayrollConfig.csv_reconciliation_field_mapping.items()}, inplace=True)
             df.to_csv(in_memory_file, index=False)
-            return in_memory_file, error_df.set_index(PayrollConfig.csv_reconciliation_code_column)\
-                                   [PayrollConfig.csv_reconciliation_errors_column].to_dict(), summary
+            return in_memory_file, error_df.set_index(WorkerVoucherConfig.csv_reconciliation_code_column)\
+                                   [WorkerVoucherConfig.csv_worker_upload_errors_column].to_dict(), summary
         return file, None, summary
 
     def _validate_dataframe(self, df):
@@ -456,13 +458,73 @@ class WorkerUploadService:
             raise ValueError(_("Unknown error while loading import file"))
         if df.empty:
             raise ValueError(_("Import file is empty"))
+        if WorkerVoucherConfig.csv_worker_upload_errors_column in df.columns:
+            raise ValueError(_("Column errors in csv."))
 
-    @staticmethod
-    def get_worker_upload_payment_file_path(economic_unit_id, file_name=None):
-        if file_name:
-            return f"csv_worker_upload/economic_unit_{economic_unit_id}/{file_name}"
-        return f"csv_worker_upload/economic_unit_{economic_unit_id}"
+    def _resolve_economic_unit(self, economic_unit_code):
+        if not economic_unit_code:
+            raise ValueError('worker_upload.validation.economic_unit_code_required')
+        economic_unit = PolicyHolder.objects.filter(code=economic_unit_code, is_deleted=False).first()
+        if not economic_unit:
+            raise ValueError('worker_upload.validation.economic_unit_not_found')
+        return economic_unit
 
+    def _upload_record_with_worker(self, economic_unit, row):
+        errors = []
+        user_policyholders = PolicyHolder.objects.filter(
+            economic_unit_user_filter(self.user)).values_list('id', flat=True)
+        chf_id = row[WorkerVoucherConfig.worker_upload_chf_id_type]
+        print(chf_id)
+        ph = PolicyHolder.objects.filter(
+            id=economic_unit.id,
+            is_deleted=False,
+        ).first()
+        if not ph:
+            errors.append({"message": _("worker_upload.validation.economic_unit_not_exist")})
+        if ph.id not in user_policyholders:
+            errors.append({
+                "message": _("worker_upload.validation.no_authority_to_use_selected_economic_unit")
+            })
+        """
+        data_from_mconnect = {}
+        if WorkerVoucherConfig.validate_created_worker_online:
+            online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, ph)
+            if not online_result.get("success", False):
+                return online_result
+            else:
+                data_from_mconnect['other_names'] = online_result["data"]["GivenName"]
+                data_from_mconnect['last_name'] = online_result["data"]["FamilyName"]
+                data_from_mconnect['gender'] = online_result["data"]["Sex"]
+                data_from_mconnect['dob'] = online_result["data"]["DateOfBirth"]
+                data_from_mconnect['photo'] = {"photo": online_result["data"]["Photo"]}
+
+        if economic_unit:
+            phi = PolicyHolderInsuree.objects.filter(
+                insuree__chf_id=chf_id,
+                policy_holder__code=economic_unit.code,
+                is_deleted=False,
+            ).first()
+            if not phi:
+                result = None
+                worker = Insuree.objects.filter(chf_id=chf_id).first()
+                if not worker:
+                    result = super().async_mutate(self.user, **data_from_mconnect)
+                if not result:
+                    worker = Insuree.objects.filter(chf_id=chf_id).first()
+                    policy_holder_insuree_service = PolicyHolderInsureeService(self.user)
+                    policy_holder = PolicyHolder.objects.get(code=economic_unit.code, is_deleted=False)
+                    policy_holder_insuree = {
+                        'policy_holder_id': f'{policy_holder.id}',
+                        'insuree_id': worker.id,
+                        'contribution_plan_bundle_id': None,
+                    }
+                    policy_holder_insuree_service.create(policy_holder_insuree)
+                else:
+                    return result
+            else:
+                return errors.append({"message": _("workers.validation.worker_already_assigned_to_unit")})
+        """
+        return errors if errors else None
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:
     if user.is_imis_admin:
