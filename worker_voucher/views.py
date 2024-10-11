@@ -32,7 +32,7 @@ class WorkerUploadAPIView(views.APIView):
             file_to_upload, errors, summary = service.upload_worker(economic_unit_code, file, upload)
             print(errors)
             if errors:
-                upload.status = WorkerUpload.Status.FAIL
+                upload.status = WorkerUpload.Status.PARTIAL_SUCCESS
                 upload.error = errors
                 upload.json_ext = {'extra_info': summary}
             else:

@@ -44,6 +44,7 @@ class WorkerUpload(HistoryModel):
         TRIGGERED = 'TRIGGERED', _('Triggered')
         IN_PROGRESS = 'IN_PROGRESS', _('In progress')
         SUCCESS = 'SUCCESS', _('Success')
+        PARTIAL_SUCCESS = 'PARTIAL_SUCCESS', _('Partial success')
         FAIL = 'FAIL', _('Fail')
 
     policyholder = models.ForeignKey(PolicyHolder, models.DO_NOTHING, null=True, blank=True)
