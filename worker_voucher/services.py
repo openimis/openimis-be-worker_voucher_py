@@ -15,6 +15,7 @@ from core.models import InteractiveUser, User
 from core.services import BaseService
 from core.signals import register_service_signal
 from insuree.models import Insuree
+from insuree.gql_mutations import update_or_create_insuree
 from invoice.models import Bill
 from invoice.services import BillService
 from policyholder.models import PolicyHolder, PolicyHolderInsuree
@@ -441,7 +442,7 @@ class WorkerUploadService:
 
         summary = {
             'affected_rows': affected_rows,
-            'total_number_of_benefits_in_file': total_number_of_records_in_file,
+            'total_number_of_records_in_file': total_number_of_records_in_file,
             'skipped_items': skipped_items
         }
 
@@ -449,7 +450,7 @@ class WorkerUploadService:
         if not error_df.empty:
             in_memory_file = BytesIO()
             df.to_csv(in_memory_file, index=False)
-            return in_memory_file, error_df.set_index(WorkerVoucherConfig.csv_reconciliation_code_column)\
+            return in_memory_file, error_df.set_index(WorkerVoucherConfig.worker_upload_chf_id_type)\
                                    [WorkerVoucherConfig.csv_worker_upload_errors_column].to_dict(), summary
         return file, None, summary
 
@@ -487,19 +488,32 @@ class WorkerUploadService:
             errors.append({
                 "message": _("worker_upload.validation.no_authority_to_use_selected_economic_unit")
             })
-        """
+
         data_from_mconnect = {}
         if WorkerVoucherConfig.validate_created_worker_online:
-            online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, ph)
+            #TODO add here connection with real service, at this stage data is hardcoded for local development
+            # online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, ph)
+            online_result = {
+                "success": True,
+                "data": {
+                    "GivenName": "Test",
+                    "FamilyName": "Test",
+                    "Sex": "M",
+                    "DateOfBirth": "1999-04-04"
+                }
+            }
+            print(online_result)
             if not online_result.get("success", False):
                 return online_result
             else:
+                data_from_mconnect['chf_id'] = chf_id
                 data_from_mconnect['other_names'] = online_result["data"]["GivenName"]
                 data_from_mconnect['last_name'] = online_result["data"]["FamilyName"]
-                data_from_mconnect['gender'] = online_result["data"]["Sex"]
+                # data_from_mconnect['gender'] = online_result["data"]["Sex"]
                 data_from_mconnect['dob'] = online_result["data"]["DateOfBirth"]
-                data_from_mconnect['photo'] = {"photo": online_result["data"]["Photo"]}
-
+                # TODO uncomment photo when integration is turn on
+                #data_from_mconnect['photo'] = {"photo": online_result["data"]["Photo"]}
+        print(data_from_mconnect)
         if economic_unit:
             phi = PolicyHolderInsuree.objects.filter(
                 insuree__chf_id=chf_id,
@@ -507,11 +521,18 @@ class WorkerUploadService:
                 is_deleted=False,
             ).first()
             if not phi:
-                result = None
                 worker = Insuree.objects.filter(chf_id=chf_id).first()
                 if not worker:
-                    result = super().async_mutate(self.user, **data_from_mconnect)
-                if not result:
+                    data_from_mconnect['audit_user_id'] = self.user.id_for_audit
+                    from core.utils import TimeUtils
+                    data_from_mconnect['validity_from'] = TimeUtils.now()
+                    try:
+                        worker = update_or_create_insuree(data_from_mconnect, self.user)
+                        print(worker)
+                    except Exception as e:
+                        errors.append({"success": False, "error": str(e)})
+                if worker:
+                    print('worker add relations with company')
                     worker = Insuree.objects.filter(chf_id=chf_id).first()
                     policy_holder_insuree_service = PolicyHolderInsureeService(self.user)
                     policy_holder = PolicyHolder.objects.get(code=economic_unit.code, is_deleted=False)
@@ -520,12 +541,10 @@ class WorkerUploadService:
                         'insuree_id': worker.id,
                         'contribution_plan_bundle_id': None,
                     }
-                    policy_holder_insuree_service.create(policy_holder_insuree)
-                else:
-                    return result
+                    result = policy_holder_insuree_service.create(policy_holder_insuree)
+                    print(result)
             else:
-                return errors.append({"message": _("workers.validation.worker_already_assigned_to_unit")})
-        """
+                errors.append({"message": _("workers.validation.worker_already_assigned_to_unit")})
         return errors if errors else None
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:

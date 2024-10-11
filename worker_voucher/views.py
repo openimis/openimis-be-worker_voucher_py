@@ -30,8 +30,9 @@ class WorkerUploadAPIView(views.APIView):
             file_handler.check_file_path()
             service = WorkerUploadService(request.user)
             file_to_upload, errors, summary = service.upload_worker(economic_unit_code, file, upload)
+            print(errors)
             if errors:
-                upload.status = WorkerUpload.Status.PARTIAL_SUCCESS
+                upload.status = WorkerUpload.Status.FAIL
                 upload.error = errors
                 upload.json_ext = {'extra_info': summary}
             else:
@@ -39,7 +40,7 @@ class WorkerUploadAPIView(views.APIView):
                 upload.json_ext = {'extra_info': summary}
             upload.save(username=request.user.login_name)
             file_handler.save_file(file_to_upload)
-            return Response({'success': True, 'error': None}, status=201)
+            return Response({'success': True, 'error': errors, 'summary': summary}, status=201)
         except Exception as exc:
             logger.error("Error while uploading CSV reconciliation", exc_info=exc)
             if upload:
@@ -51,4 +52,4 @@ class WorkerUploadAPIView(views.APIView):
                 }
                 upload.json_ext = {'extra_info': summary}
                 upload.save(username=request.user.login_name)
-            return Response({'success': False, 'error': str(exc)}, status=500)
+            return Response({'success': False, 'error': str(exc), 'summary': summary}, status=500)
