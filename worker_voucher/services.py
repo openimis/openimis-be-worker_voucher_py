@@ -493,26 +493,16 @@ class WorkerUploadService:
                 "message": _("worker_upload.validation.no_authority_to_use_selected_economic_unit")
             })
         data_from_mconnect = self._fetch_data_from_mconnect(chf_id, ph)
-        if "success" in data_from_mconnect and data_from_mconnect.get("success", False):
+        if data_from_mconnect.get("success", False):
             errors.append(data_from_mconnect)
-        if economic_unit:
+        else:
             self._add_worker_to_system(chf_id, economic_unit, data_from_mconnect, errors)
         return errors if errors else None
 
     def _fetch_data_from_mconnect(self, chf_id, policyholder):
         data_from_mconnect = {}
         if WorkerVoucherConfig.validate_created_worker_online:
-            # TODO add here connection with real service, at this stage data is hardcoded for local development
-            # online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, policyholder)
-            online_result = {
-                "success": True,
-                "data": {
-                    "GivenName": "Test",
-                    "FamilyName": "Test",
-                    "Sex": "M",
-                    "DateOfBirth": "1999-04-04"
-                }
-            }
+            online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, policyholder)
             if not online_result.get("success", False):
                 return online_result
             else:
@@ -520,9 +510,8 @@ class WorkerUploadService:
                 data_from_mconnect['other_names'] = online_result["data"]["GivenName"]
                 data_from_mconnect['last_name'] = online_result["data"]["FamilyName"]
                 data_from_mconnect['dob'] = online_result["data"]["DateOfBirth"]
-                # TODO uncomment photo when integration is turn on
-                # data_from_mconnect['photo'] = {"photo": online_result["data"]["Photo"]}
-                return data_from_mconnect
+                data_from_mconnect['photo'] = {"photo": online_result["data"]["Photo"]}
+        return data_from_mconnect
 
     def _add_worker_to_system(self, chf_id, economic_unit, data_from_mconnect, errors):
         phi = PolicyHolderInsuree.objects.filter(

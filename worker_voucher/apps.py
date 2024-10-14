@@ -24,7 +24,7 @@ DEFAULT_CONFIG = {
     # voucher_expiry_type = "fixed_period" or "end_of_year"
     "voucher_expiry_type": "end_of_year",
     "yearly_worker_voucher_limit": 120,
-    "validate_created_worker_online": True,
+    "validate_created_worker_online": False,
     "csv_worker_upload_errors_column": "errors",
     "worker_upload_chf_id_type": "national_id"
 }
