@@ -417,6 +417,8 @@ class WorkerUploadService:
         self.user = user
 
     def upload_worker(self, economic_unit_code, file, upload):
+        error_column = WorkerVoucherConfig.csv_worker_upload_errors_column
+        chf_id_type_column = WorkerVoucherConfig.worker_upload_chf_id_type
         economic_unit = self._resolve_economic_unit(economic_unit_code)
         upload.policyholder = economic_unit
         upload.status = upload.Status.IN_PROGRESS
@@ -430,12 +432,12 @@ class WorkerUploadService:
         skipped_items = 0
         total_number_of_records_in_file = len(df)
 
-        df[WorkerVoucherConfig.csv_worker_upload_errors_column] = (
+        df[error_column] = (
             df.apply(lambda row: self._upload_record_with_worker(economic_unit, row), axis=1)
         )
 
         for _, row in df.iterrows():
-            if not pd.isna(row[WorkerVoucherConfig.csv_worker_upload_errors_column]):
+            if not pd.isna(row[error_column]):
                 skipped_items += 1
             else:
                 affected_rows += 1
@@ -446,12 +448,15 @@ class WorkerUploadService:
             'skipped_items': skipped_items
         }
 
-        error_df = df[df[WorkerVoucherConfig.csv_worker_upload_errors_column].apply(lambda x: bool(x))]
+        error_df = df[df[error_column].apply(lambda x: bool(x))]
         if not error_df.empty:
             in_memory_file = BytesIO()
             df.to_csv(in_memory_file, index=False)
-            return in_memory_file, error_df.set_index(WorkerVoucherConfig.worker_upload_chf_id_type)\
-                                   [WorkerVoucherConfig.csv_worker_upload_errors_column].to_dict(), summary
+            return (
+                in_memory_file,
+                error_df.set_index(chf_id_type_column)[error_column].to_dict(),
+                summary
+            )
         return file, None, summary
 
     def _validate_dataframe(self, df):
@@ -487,7 +492,6 @@ class WorkerUploadService:
             errors.append({
                 "message": _("worker_upload.validation.no_authority_to_use_selected_economic_unit")
             })
-
         data_from_mconnect = self._fetch_data_from_mconnect(chf_id, ph)
         if "success" in data_from_mconnect and data_from_mconnect.get("success", False):
             errors.append(data_from_mconnect)
