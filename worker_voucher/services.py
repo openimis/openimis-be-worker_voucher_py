@@ -477,7 +477,6 @@ class WorkerUploadService:
         user_policyholders = PolicyHolder.objects.filter(
             economic_unit_user_filter(self.user)).values_list('id', flat=True)
         chf_id = row[WorkerVoucherConfig.worker_upload_chf_id_type]
-        print(chf_id)
         ph = PolicyHolder.objects.filter(
             id=economic_unit.id,
             is_deleted=False,
@@ -489,10 +488,18 @@ class WorkerUploadService:
                 "message": _("worker_upload.validation.no_authority_to_use_selected_economic_unit")
             })
 
+        data_from_mconnect = self._fetch_data_from_mconnect(chf_id, ph)
+        if "success" in data_from_mconnect and data_from_mconnect.get("success", False):
+            errors.append(data_from_mconnect)
+        if economic_unit:
+            self._add_worker_to_system(chf_id, economic_unit, data_from_mconnect, errors)
+        return errors if errors else None
+
+    def _fetch_data_from_mconnect(self, chf_id, policyholder):
         data_from_mconnect = {}
         if WorkerVoucherConfig.validate_created_worker_online:
-            #TODO add here connection with real service, at this stage data is hardcoded for local development
-            # online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, ph)
+            # TODO add here connection with real service, at this stage data is hardcoded for local development
+            # online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, policyholder)
             online_result = {
                 "success": True,
                 "data": {
@@ -502,50 +509,47 @@ class WorkerUploadService:
                     "DateOfBirth": "1999-04-04"
                 }
             }
-            print(online_result)
             if not online_result.get("success", False):
                 return online_result
             else:
                 data_from_mconnect['chf_id'] = chf_id
                 data_from_mconnect['other_names'] = online_result["data"]["GivenName"]
                 data_from_mconnect['last_name'] = online_result["data"]["FamilyName"]
-                # data_from_mconnect['gender'] = online_result["data"]["Sex"]
                 data_from_mconnect['dob'] = online_result["data"]["DateOfBirth"]
                 # TODO uncomment photo when integration is turn on
-                #data_from_mconnect['photo'] = {"photo": online_result["data"]["Photo"]}
-        print(data_from_mconnect)
-        if economic_unit:
-            phi = PolicyHolderInsuree.objects.filter(
-                insuree__chf_id=chf_id,
-                policy_holder__code=economic_unit.code,
-                is_deleted=False,
-            ).first()
-            if not phi:
+                # data_from_mconnect['photo'] = {"photo": online_result["data"]["Photo"]}
+                return data_from_mconnect
+
+    def _add_worker_to_system(self, chf_id, economic_unit, data_from_mconnect, errors):
+        phi = PolicyHolderInsuree.objects.filter(
+            insuree__chf_id=chf_id,
+            policy_holder__code=economic_unit.code,
+            is_deleted=False,
+        ).first()
+        if not phi:
+            worker = Insuree.objects.filter(chf_id=chf_id).first()
+            if not worker:
+                data_from_mconnect['audit_user_id'] = self.user.id_for_audit
+                from core.utils import TimeUtils
+                data_from_mconnect['validity_from'] = TimeUtils.now()
+                try:
+                    worker = update_or_create_insuree(data_from_mconnect, self.user)
+                except Exception as e:
+                    errors.append({"success": False, "error": str(e)})
+            if worker:
                 worker = Insuree.objects.filter(chf_id=chf_id).first()
-                if not worker:
-                    data_from_mconnect['audit_user_id'] = self.user.id_for_audit
-                    from core.utils import TimeUtils
-                    data_from_mconnect['validity_from'] = TimeUtils.now()
-                    try:
-                        worker = update_or_create_insuree(data_from_mconnect, self.user)
-                        print(worker)
-                    except Exception as e:
-                        errors.append({"success": False, "error": str(e)})
-                if worker:
-                    print('worker add relations with company')
-                    worker = Insuree.objects.filter(chf_id=chf_id).first()
-                    policy_holder_insuree_service = PolicyHolderInsureeService(self.user)
-                    policy_holder = PolicyHolder.objects.get(code=economic_unit.code, is_deleted=False)
-                    policy_holder_insuree = {
-                        'policy_holder_id': f'{policy_holder.id}',
-                        'insuree_id': worker.id,
-                        'contribution_plan_bundle_id': None,
-                    }
-                    result = policy_holder_insuree_service.create(policy_holder_insuree)
-                    print(result)
-            else:
-                errors.append({"message": _("workers.validation.worker_already_assigned_to_unit")})
-        return errors if errors else None
+                policy_holder_insuree_service = PolicyHolderInsureeService(self.user)
+                policy_holder = PolicyHolder.objects.get(code=economic_unit.code, is_deleted=False)
+                policy_holder_insuree = {
+                    'policy_holder_id': f'{policy_holder.id}',
+                    'insuree_id': worker.id,
+                    'contribution_plan_bundle_id': None,
+                }
+                policy_holder_insuree_service.create(policy_holder_insuree)
+        else:
+            errors.append({"message": _("workers.validation.worker_already_assigned_to_unit")})
+        return errors
+
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:
     if user.is_imis_admin:
