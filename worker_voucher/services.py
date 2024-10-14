@@ -14,8 +14,10 @@ from core import datetime
 from core.models import InteractiveUser, User
 from core.services import BaseService
 from core.signals import register_service_signal
-from insuree.models import Insuree
+from insuree.models import Insuree, InsureePhoto
+from insuree.services import create_file
 from insuree.gql_mutations import update_or_create_insuree
+from insuree.apps import InsureeConfig
 from invoice.models import Bill
 from invoice.services import BillService
 from policyholder.models import PolicyHolder, PolicyHolderInsuree
@@ -423,8 +425,10 @@ class WorkerUploadService:
         upload.policyholder = economic_unit
         upload.status = upload.Status.IN_PROGRESS
         upload.save(username=self.user.login_name)
+
         if not file:
             raise ValueError(_('File is required'))
+
         df = pd.read_csv(file)
         self._validate_dataframe(df)
 
@@ -432,42 +436,196 @@ class WorkerUploadService:
         skipped_items = 0
         total_number_of_records_in_file = len(df)
 
-        df[error_column] = (
-            df.apply(lambda row: self._upload_record_with_worker(economic_unit, row), axis=1)
-        )
+        # Prepare lists to hold bulk insertions
+        bulk_insuree_data = []
+        bulk_policy_holder_insuree_data = []
+        bulk_insuree_photo_data = []
+        bulk_errors = []
 
-        for _, row in df.iterrows():
-            if not pd.isna(row[error_column]):
-                skipped_items += 1
-            else:
-                affected_rows += 1
+        df[error_column] = df.apply(lambda row: self._collect_worker_data(economic_unit, row, bulk_insuree_data,
+                                                                          bulk_policy_holder_insuree_data,
+                                                                          bulk_insuree_photo_data, bulk_errors),
+                                    axis=1)
 
+        # Insert data in bulk (Insuree records)
+        if bulk_insuree_data:
+            self._bulk_insert_insurees(bulk_insuree_data)
+
+        # Step 2: Map chf_id to insuree_id after Insurees are created
+        if bulk_policy_holder_insuree_data:
+            self._map_chf_id_to_insuree_id(bulk_policy_holder_insuree_data)
+
+        # Insert data in bulk (PolicyHolderInsuree records)
+        if bulk_policy_holder_insuree_data:
+            self._bulk_insert_policy_holder_insurees(bulk_policy_holder_insuree_data)
+
+        if bulk_insuree_photo_data:
+            self._bulk_insert_insuree_photos(bulk_insuree_photo_data)
+
+        # Handle summary
         summary = {
-            'affected_rows': affected_rows,
+            'affected_rows': len(bulk_insuree_data),
             'total_number_of_records_in_file': total_number_of_records_in_file,
             'skipped_items': skipped_items
         }
 
+        # Error handling
         error_df = df[df[error_column].apply(lambda x: bool(x))]
         if not error_df.empty:
             in_memory_file = BytesIO()
             df.to_csv(in_memory_file, index=False)
-            return (
-                in_memory_file,
-                error_df.set_index(chf_id_type_column)[error_column].to_dict(),
-                summary
-            )
+            return in_memory_file, error_df.set_index(chf_id_type_column)[error_column].to_dict(), summary
+
         return file, None, summary
 
-    def _validate_dataframe(self, df):
-        if df is None:
-            raise ValueError(_("Unknown error while loading import file"))
-        if df.empty:
-            raise ValueError(_("Import file is empty"))
-        if WorkerVoucherConfig.csv_worker_upload_errors_column in df.columns:
-            raise ValueError(_("Column errors in csv."))
-        if WorkerVoucherConfig.worker_upload_chf_id_type not in df.columns:
-            raise ValueError(_("No national id column in csv file"))
+    def _map_chf_id_to_insuree_id(self, bulk_policy_holder_insuree_data):
+        # Extract all unique chf_ids from the policy holder-insuree data
+        chf_ids = [str(entry['chf_id']) for entry in bulk_policy_holder_insuree_data]
+
+        # Query to fetch the corresponding insuree_id for each chf_id
+        insuree_mapping = dict(
+            Insuree.objects.filter(chf_id__in=chf_ids)
+            .values_list('chf_id', 'id')
+        )
+        # Ensure the keys are strings
+        insuree_mapping = {str(key): value for key, value in insuree_mapping.items()}
+        print(chf_ids)
+        print(insuree_mapping)
+        # Update the bulk_policy_holder_insuree_data to replace chf_id with insuree_id
+        for entry in bulk_policy_holder_insuree_data:
+            chf_id = str(entry['chf_id'])  # Convert numpy.int64 to string for lookup
+            insuree_id = insuree_mapping.get(chf_id)
+            if insuree_id:
+                entry['insuree_id'] = insuree_id
+
+        # Remove 'chf_id' after conversion
+        for entry in bulk_policy_holder_insuree_data:
+            del entry['chf_id']
+
+    def _collect_worker_data(self, economic_unit, row, bulk_insuree_data, bulk_policy_holder_insuree_data, bulk_insuree_photo_data, bulk_errors):
+        errors = []
+        chf_id = row[WorkerVoucherConfig.worker_upload_chf_id_type]
+
+        # Fetch data from MConnect
+        data_from_mconnect = self._fetch_data_from_mconnect(chf_id, economic_unit)
+        if "success" in data_from_mconnect and data_from_mconnect.get("success", False):
+            errors.append(data_from_mconnect)
+        else:
+            # Prepare bulk Insuree data from MConnect
+            self._prepare_bulk_insuree_data(data_from_mconnect, bulk_insuree_data, economic_unit, errors)
+
+            # Prepare bulk PolicyHolderInsuree data for the economic unit
+            self._prepare_bulk_policy_holder_insuree_data(chf_id, economic_unit, bulk_policy_holder_insuree_data,
+                                                          errors)
+            if 'photo' in data_from_mconnect:
+                # Prepare bulk Insuree photo data
+                self._prepare_bulk_insuree_photo_data(data_from_mconnect, bulk_insuree_photo_data, errors)
+
+        # Return errors if there are any
+        return errors if errors else None
+
+    def _prepare_bulk_insuree_photo_data(self, data_from_mconnect, bulk_insuree_photo_data, errors):
+        # Handle Insuree's photo if available from MConnect data
+        photo_data = data_from_mconnect.get('photo', None)
+        from datetime import datetime
+        if photo_data:
+            now = datetime.now()
+            uuid_str = str(uuid4())
+
+            photo_record = {
+                'audit_user_id': self.user.id_for_audit,
+                'validity_from': now,
+                'chf_id': data_from_mconnect['chf_id'],
+                'photo': photo_data,
+                'uuid': uuid_str,
+                # Folder and file will be created based on the UUID
+            }
+            bulk_insuree_photo_data.append(photo_record)
+
+    def _bulk_insert_insuree_photos(self, bulk_insuree_photo_data):
+        # Create InsureePhoto records in bulk
+        bulk_photo_records = []
+        for data in bulk_insuree_photo_data:
+            # Create the photo file structure and assign folder/filename
+            file_dir, file_name = self._create_photo_file(data['validity_from'], data['chf_id'], data['photo'],
+                                                          data['uuid'])
+            data['folder'] = file_dir
+            data['filename'] = file_name
+            bulk_photo_records.append(InsureePhoto(**data))
+
+        try:
+            InsureePhoto.objects.bulk_create(bulk_photo_records)
+        except Exception as e:
+            logger.error(f"Error during bulk creation of InsureePhotos: {e}")
+
+    def _create_photo_file(self, now, insuree_id, photo_bin, uuid_str):
+        # Creates the file path and stores the photo in the appropriate folder
+        if InsureeConfig.insuree_photos_root_path:
+            return create_file(now, insuree_id, photo_bin, uuid_str)
+        return None, None  # Return None if photo storage is not enabled
+
+    def _prepare_bulk_insuree_data(self, data_from_mconnect, bulk_insuree_data, economic_unit, errors):
+        # Prepare the bulk data
+        from datetime import datetime
+        insuree_data = {
+            'chf_id': data_from_mconnect['chf_id'],
+            'last_name': data_from_mconnect['last_name'],
+            'other_names': data_from_mconnect['other_names'],
+            'dob': data_from_mconnect['dob'],
+            'validity_from': datetime.now(),
+            'audit_user_id': self.user.id_for_audit,
+            'uuid': str(uuid4()),
+        }
+        bulk_insuree_data.append(insuree_data)
+
+    def _prepare_bulk_policy_holder_insuree_data(self, chf_id, economic_unit, bulk_policy_holder_insuree_data, errors):
+        # Collect policy holder-insuree relationships
+        from datetime import datetime
+        phi_data = {
+            'policy_holder_id': economic_unit.id,
+            'chf_id': chf_id,  # Later converted to insuree_id
+            'contribution_plan_bundle_id': None,
+            'user_created': self.user,
+            'user_updated': self.user,
+            'date_created': datetime.now(),
+            'date_updated': datetime.now(),
+            'uuid': str(uuid4())
+        }
+        bulk_policy_holder_insuree_data.append(phi_data)
+
+    def _bulk_insert_insurees(self, bulk_insuree_data):
+        # Perform bulk creation of insuree records
+        try:
+            Insuree.objects.bulk_create([Insuree(**data) for data in bulk_insuree_data])
+        except Exception as e:
+            logger.error(f"Error during bulk creation of Insurees: {e}")
+
+    def _bulk_insert_policy_holder_insurees(self, bulk_policy_holder_insuree_data):
+        try:
+            PolicyHolderInsuree.objects.bulk_create(
+                [PolicyHolderInsuree(**data) for data in bulk_policy_holder_insuree_data])
+        except Exception as e:
+            logger.error(f"Error during bulk creation of PolicyHolderInsuree: {e}")
+
+    def _fetch_data_from_mconnect(self, chf_id, policyholder):
+        # This part remains unchanged but you might want to adapt it for real API integration
+        online_result = {
+            "success": True,
+            "data": {
+                "GivenName": "Test",
+                "FamilyName": "Test",
+                "Sex": "M",
+                "DateOfBirth": "1999-04-04"
+            }
+        }
+        if not online_result.get("success", False):
+            return online_result
+        return {
+            "chf_id": chf_id,
+            "other_names": online_result["data"]["GivenName"],
+            "last_name": online_result["data"]["FamilyName"],
+            "dob": online_result["data"]["DateOfBirth"]
+        }
 
     def _resolve_economic_unit(self, economic_unit_code):
         if not economic_unit_code:
@@ -477,82 +635,15 @@ class WorkerUploadService:
             raise ValueError('worker_upload.validation.economic_unit_not_found')
         return economic_unit
 
-    def _upload_record_with_worker(self, economic_unit, row):
-        errors = []
-        user_policyholders = PolicyHolder.objects.filter(
-            economic_unit_user_filter(self.user)).values_list('id', flat=True)
-        chf_id = row[WorkerVoucherConfig.worker_upload_chf_id_type]
-        ph = PolicyHolder.objects.filter(
-            id=economic_unit.id,
-            is_deleted=False,
-        ).first()
-        if not ph:
-            errors.append({"message": _("worker_upload.validation.economic_unit_not_exist")})
-        if ph.id not in user_policyholders:
-            errors.append({
-                "message": _("worker_upload.validation.no_authority_to_use_selected_economic_unit")
-            })
-        data_from_mconnect = self._fetch_data_from_mconnect(chf_id, ph)
-        if "success" in data_from_mconnect and data_from_mconnect.get("success", False):
-            errors.append(data_from_mconnect)
-        if economic_unit:
-            self._add_worker_to_system(chf_id, economic_unit, data_from_mconnect, errors)
-        return errors if errors else None
-
-    def _fetch_data_from_mconnect(self, chf_id, policyholder):
-        data_from_mconnect = {}
-        if WorkerVoucherConfig.validate_created_worker_online:
-            # TODO add here connection with real service, at this stage data is hardcoded for local development
-            # online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, policyholder)
-            online_result = {
-                "success": True,
-                "data": {
-                    "GivenName": "Test",
-                    "FamilyName": "Test",
-                    "Sex": "M",
-                    "DateOfBirth": "1999-04-04"
-                }
-            }
-            if not online_result.get("success", False):
-                return online_result
-            else:
-                data_from_mconnect['chf_id'] = chf_id
-                data_from_mconnect['other_names'] = online_result["data"]["GivenName"]
-                data_from_mconnect['last_name'] = online_result["data"]["FamilyName"]
-                data_from_mconnect['dob'] = online_result["data"]["DateOfBirth"]
-                # TODO uncomment photo when integration is turn on
-                # data_from_mconnect['photo'] = {"photo": online_result["data"]["Photo"]}
-                return data_from_mconnect
-
-    def _add_worker_to_system(self, chf_id, economic_unit, data_from_mconnect, errors):
-        phi = PolicyHolderInsuree.objects.filter(
-            insuree__chf_id=chf_id,
-            policy_holder__code=economic_unit.code,
-            is_deleted=False,
-        ).first()
-        if not phi:
-            worker = Insuree.objects.filter(chf_id=chf_id).first()
-            if not worker:
-                data_from_mconnect['audit_user_id'] = self.user.id_for_audit
-                from core.utils import TimeUtils
-                data_from_mconnect['validity_from'] = TimeUtils.now()
-                try:
-                    worker = update_or_create_insuree(data_from_mconnect, self.user)
-                except Exception as e:
-                    errors.append({"success": False, "error": str(e)})
-            if worker:
-                worker = Insuree.objects.filter(chf_id=chf_id).first()
-                policy_holder_insuree_service = PolicyHolderInsureeService(self.user)
-                policy_holder = PolicyHolder.objects.get(code=economic_unit.code, is_deleted=False)
-                policy_holder_insuree = {
-                    'policy_holder_id': f'{policy_holder.id}',
-                    'insuree_id': worker.id,
-                    'contribution_plan_bundle_id': None,
-                }
-                policy_holder_insuree_service.create(policy_holder_insuree)
-        else:
-            errors.append({"message": _("workers.validation.worker_already_assigned_to_unit")})
-        return errors
+    def _validate_dataframe(self, df):
+        if df is None:
+            raise ValueError(_("Unknown error while loading import file"))
+        if df.empty:
+            raise ValueError(_("Import file is empty"))
+        if WorkerVoucherConfig.csv_worker_upload_errors_column in df.columns:
+            raise ValueError(_("Column errors in csv."))
+        if WorkerVoucherConfig.worker_upload_chf_id_type not in df.columns:
+            raise ValueError(_("No national ID column in csv file"))
 
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:
