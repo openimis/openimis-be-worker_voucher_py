@@ -61,10 +61,7 @@ def download_worker_upload(request):
     try:
         filename = request.query_params.get('filename')
         economic_unit_code = request.query_params.get('economic_unit_code')
-        print(filename)
-        print(economic_unit_code)
         target_file_path = WorkerVoucherConfig.get_worker_upload_payment_file_path(economic_unit_code, filename)
-        print(target_file_path)
         file_handler = DefaultStorageFileHandler(target_file_path)
         return file_handler.get_file_response_csv(filename)
 
