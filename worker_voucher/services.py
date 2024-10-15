@@ -425,7 +425,7 @@ class WorkerUploadService:
         upload.save(username=self.user.login_name)
         if not file:
             raise ValueError(_('File is required'))
-        df = pd.read_csv(file)
+        df = self._read_file(file)
         self._validate_dataframe(df)
 
         affected_rows = 0
@@ -458,6 +458,14 @@ class WorkerUploadService:
                 summary
             )
         return file, None, summary
+
+    def _read_file(self, file):
+        if file.name.endswith('.csv'):
+            return pd.read_csv(file)
+        elif file.name.endswith(('.xls', '.xlsx')):
+            return pd.read_excel(file)
+        else:
+            raise ValueError(_('Unsupported file format. Please upload a CSV or Excel file.'))
 
     def _validate_dataframe(self, df):
         if df is None:

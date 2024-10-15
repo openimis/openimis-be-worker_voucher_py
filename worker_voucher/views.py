@@ -10,12 +10,13 @@ from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerUpload
 from policyholder.models import PolicyHolder
 from worker_voucher.services import WorkerUploadService
+from insuree.apps import InsureeConfig
 
 logger = logging.getLogger(__name__)
 
 
 class WorkerUploadAPIView(views.APIView):
-    permission_classes = [check_user_rights(WorkerVoucherConfig.gql_worker_voucher_create_perms, )]
+    permission_classes = [check_user_rights(InsureeConfig.gql_mutation_create_insurees_perms, )]
 
     @transaction.atomic
     def post(self, request):
