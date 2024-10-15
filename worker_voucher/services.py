@@ -463,7 +463,7 @@ class WorkerUploadService:
         if file.name.endswith('.csv'):
             return pd.read_csv(file)
         elif file.name.endswith(('.xls', '.xlsx')):
-            return pd.read_excel(file)
+            return pd.read_excel(file, engine='openpyxl')
         else:
             raise ValueError(_('Unsupported file format. Please upload a CSV or Excel file.'))
 

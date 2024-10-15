@@ -1,7 +1,8 @@
 import logging
 
 from django.db import transaction
-from rest_framework import views
+from rest_framework import status, views
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from core.utils import DefaultStorageFileHandler
@@ -28,7 +29,6 @@ class WorkerUploadAPIView(views.APIView):
             target_file_path = WorkerVoucherConfig.get_worker_upload_payment_file_path(economic_unit_code, file.name)
             upload.file_name = file.name
             file_handler = DefaultStorageFileHandler(target_file_path)
-            file_handler.check_file_path()
             service = WorkerUploadService(request.user)
             file_to_upload, errors, summary = service.upload_worker(economic_unit_code, file, upload)
             if errors:
@@ -39,7 +39,7 @@ class WorkerUploadAPIView(views.APIView):
                 upload.status = WorkerUpload.Status.SUCCESS
                 upload.json_ext = {'extra_info': summary}
             upload.save(username=request.user.login_name)
-            file_handler.save_file(file_to_upload)
+            file_handler.save_with_possibility_to_overwrite_file(file_to_upload)
             return Response({'success': True, 'error': errors, 'summary': summary}, status=201)
         except Exception as exc:
             logger.error("Error while uploading workers", exc_info=exc)
@@ -53,3 +53,27 @@ class WorkerUploadAPIView(views.APIView):
                 upload.json_ext = {'extra_info': summary}
                 upload.save(username=request.user.login_name)
             return Response({'success': False, 'error': str(exc), 'summary': summary}, status=500)
+
+
+@api_view(["GET"])
+@permission_classes([check_user_rights(InsureeConfig.gql_mutation_create_insurees_perms, )])
+def download_worker_upload(request):
+    try:
+        filename = request.query_params.get('filename')
+        economic_unit_code = request.query_params.get('economic_unit_code')
+        print(filename)
+        print(economic_unit_code)
+        target_file_path = WorkerVoucherConfig.get_worker_upload_payment_file_path(economic_unit_code, filename)
+        print(target_file_path)
+        file_handler = DefaultStorageFileHandler(target_file_path)
+        return file_handler.get_file_response_csv(filename)
+
+    except ValueError as exc:
+        logger.error("Error while fetching data", exc_info=exc)
+        return Response({'success': False, 'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    except FileNotFoundError as exc:
+        logger.error("Error while getting file", exc_info=exc)
+        return Response({'success': False, 'error': str(exc)}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as exc:
+        logger.error("Unexpected error", exc_info=exc)
+        return Response({'success': False, 'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
