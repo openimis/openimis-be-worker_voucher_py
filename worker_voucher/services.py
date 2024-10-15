@@ -1,4 +1,6 @@
 import logging
+import pandas as pd
+from io import BytesIO
 from decimal import Decimal
 from typing import Iterable, Dict, Union, List
 from uuid import uuid4
@@ -13,9 +15,12 @@ from core.models import InteractiveUser, User
 from core.services import BaseService
 from core.signals import register_service_signal
 from insuree.models import Insuree
+from insuree.gql_mutations import update_or_create_insuree
 from invoice.models import Bill
 from invoice.services import BillService
-from policyholder.models import PolicyHolder
+from policyholder.models import PolicyHolder, PolicyHolderInsuree
+from policyholder.services import PolicyHolderInsuree as PolicyHolderInsureeService
+from msystems.services.mconnect_worker_service import MConnectWorkerService
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
 from worker_voucher.validation import WorkerVoucherValidation
@@ -220,10 +225,10 @@ def _get_voucher_expiry_date(start_date: datetime):
     expiry_type = WorkerVoucherConfig.voucher_expiry_type
 
     if expiry_type == "end_of_year":
-        expiry_date = datetime.date(start_date.year, 12, 31)
+        expiry_date = datetime.datetime(start_date.year, 12, 31, 23, 59, 59)
     elif expiry_type == "fixed_period":
         expiry_period = WorkerVoucherConfig.voucher_expiry_period
-        expiry_date = datetime.date.today() + datetime.datetimedelta(**expiry_period)
+        expiry_date = datetime.datetime.today() + datetime.datetimedelta(**expiry_period)
     else:
         raise VoucherException(_("Invalid voucher expiry type"))
 
@@ -274,7 +279,7 @@ def get_worker_yearly_voucher_count_counts(insuree: Insuree, user: User, year):
 
 
 def create_assigned_voucher(user, date, insuree_id, policyholder_id):
-    current_date = datetime.date.today()
+    current_date = datetime.datetime.today()
     expiry_date = _get_voucher_expiry_date(current_date)
 
     voucher_service = WorkerVoucherService(user)
@@ -405,6 +410,146 @@ def worker_user_filter(user: User, economic_unit_code=None, prefix='') -> Q:
                 f"{prefix}policyholderinsuree__policy_holder__code": economic_unit_code,
             }
         return Q(**filters)
+
+
+class WorkerUploadService:
+    def __init__(self, user: InteractiveUser):
+        self.user = user
+
+    def upload_worker(self, economic_unit_code, file, upload):
+        error_column = WorkerVoucherConfig.csv_worker_upload_errors_column
+        chf_id_type_column = WorkerVoucherConfig.worker_upload_chf_id_type
+        economic_unit = self._resolve_economic_unit(economic_unit_code)
+        upload.policyholder = economic_unit
+        upload.status = upload.Status.IN_PROGRESS
+        upload.save(username=self.user.login_name)
+        if not file:
+            raise ValueError(_('File is required'))
+        df = self._read_file(file)
+        self._validate_dataframe(df)
+
+        affected_rows = 0
+        skipped_items = 0
+        total_number_of_records_in_file = len(df)
+
+        df[error_column] = (
+            df.apply(lambda row: self._upload_record_with_worker(economic_unit, row), axis=1)
+        )
+
+        for _, row in df.iterrows():
+            if not pd.isna(row[error_column]):
+                skipped_items += 1
+            else:
+                affected_rows += 1
+
+        summary = {
+            'affected_rows': affected_rows,
+            'total_number_of_records_in_file': total_number_of_records_in_file,
+            'skipped_items': skipped_items
+        }
+
+        error_df = df[df[error_column].apply(lambda x: bool(x))]
+        if not error_df.empty:
+            in_memory_file = BytesIO()
+            df.to_csv(in_memory_file, index=False)
+            return (
+                in_memory_file,
+                error_df.set_index(chf_id_type_column)[error_column].to_dict(),
+                summary
+            )
+        return file, None, summary
+
+    def _read_file(self, file):
+        if file.name.endswith('.csv'):
+            return pd.read_csv(file)
+        elif file.name.endswith(('.xls', '.xlsx')):
+            return pd.read_excel(file, engine='openpyxl')
+        else:
+            raise ValueError(_('Unsupported file format. Please upload a CSV or Excel file.'))
+
+    def _validate_dataframe(self, df):
+        if df is None:
+            raise ValueError(_("Unknown error while loading import file"))
+        if df.empty:
+            raise ValueError(_("Import file is empty"))
+        if WorkerVoucherConfig.csv_worker_upload_errors_column in df.columns:
+            raise ValueError(_("Column errors in csv."))
+        if WorkerVoucherConfig.worker_upload_chf_id_type not in df.columns:
+            raise ValueError(_("No national id column in csv file"))
+
+    def _resolve_economic_unit(self, economic_unit_code):
+        if not economic_unit_code:
+            raise ValueError('worker_upload.validation.economic_unit_code_required')
+        economic_unit = PolicyHolder.objects.filter(code=economic_unit_code, is_deleted=False).first()
+        if not economic_unit:
+            raise ValueError('worker_upload.validation.economic_unit_not_found')
+        return economic_unit
+
+    def _upload_record_with_worker(self, economic_unit, row):
+        errors = []
+        user_policyholders = PolicyHolder.objects.filter(
+            economic_unit_user_filter(self.user)).values_list('id', flat=True)
+        chf_id = row[WorkerVoucherConfig.worker_upload_chf_id_type]
+        ph = PolicyHolder.objects.filter(
+            id=economic_unit.id,
+            is_deleted=False,
+        ).first()
+        if not ph:
+            errors.append({"message": _("worker_upload.validation.economic_unit_not_exist")})
+        if ph.id not in user_policyholders:
+            errors.append({
+                "message": _("worker_upload.validation.no_authority_to_use_selected_economic_unit")
+            })
+        data_from_mconnect = self._fetch_data_from_mconnect(chf_id, ph)
+        if data_from_mconnect.get("success", False):
+            errors.append(data_from_mconnect)
+        else:
+            self._add_worker_to_system(chf_id, economic_unit, data_from_mconnect, errors)
+        return errors if errors else None
+
+    def _fetch_data_from_mconnect(self, chf_id, policyholder):
+        data_from_mconnect = {}
+        if WorkerVoucherConfig.validate_created_worker_online:
+            online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, policyholder)
+            if not online_result.get("success", False):
+                return online_result
+            else:
+                data_from_mconnect['chf_id'] = chf_id
+                data_from_mconnect['other_names'] = online_result["data"]["GivenName"]
+                data_from_mconnect['last_name'] = online_result["data"]["FamilyName"]
+                data_from_mconnect['dob'] = online_result["data"]["DateOfBirth"]
+                data_from_mconnect['photo'] = {"photo": online_result["data"]["Photo"]}
+        return data_from_mconnect
+
+    def _add_worker_to_system(self, chf_id, economic_unit, data_from_mconnect, errors):
+        phi = PolicyHolderInsuree.objects.filter(
+            insuree__chf_id=chf_id,
+            policy_holder__code=economic_unit.code,
+            is_deleted=False,
+        ).first()
+        if not phi:
+            worker = Insuree.objects.filter(chf_id=chf_id).first()
+            if not worker:
+                data_from_mconnect['audit_user_id'] = self.user.id_for_audit
+                from core.utils import TimeUtils
+                data_from_mconnect['validity_from'] = TimeUtils.now()
+                try:
+                    worker = update_or_create_insuree(data_from_mconnect, self.user)
+                except Exception as e:
+                    errors.append({"success": False, "error": str(e)})
+            if worker:
+                worker = Insuree.objects.filter(chf_id=chf_id).first()
+                policy_holder_insuree_service = PolicyHolderInsureeService(self.user)
+                policy_holder = PolicyHolder.objects.get(code=economic_unit.code, is_deleted=False)
+                policy_holder_insuree = {
+                    'policy_holder_id': f'{policy_holder.id}',
+                    'insuree_id': worker.id,
+                    'contribution_plan_bundle_id': None,
+                }
+                policy_holder_insuree_service.create(policy_holder_insuree)
+        else:
+            errors.append({"message": _("workers.validation.worker_already_assigned_to_unit")})
+        return errors
 
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:
