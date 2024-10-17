@@ -581,30 +581,18 @@ class GroupOfWorkerService(BaseService):
                 now = datetime.datetime.now()
                 group_id = obj_data.pop('id') if 'id' in obj_data else None
                 insurees_chf_id = obj_data.pop('insurees_chf_id') if "insurees_chf_id" in obj_data else None
-                insurees = _check_insurees(insurees_chf_id, eu_code, self.user)
+                insurees = _check_insurees(insurees_chf_id, eu_code, self.user) if len(insurees_chf_id) > 0 else set()
                 if group_id:
                     group = GroupOfWorker.objects.get(id=group_id)
-                    [setattr(group, k, v) for k, v in obj_data.items()]
-                    group.save(user=self.user)
                     if insurees is not None:
                         worker_group_currently_assigned = WorkerGroup.objects.filter(group=group_id)
-                        worker_group_currently_assigned.update(date_valid_to=now, is_deleted=True)
-                        worker_group_currently_assigned = worker_group_currently_assigned.values_list(
-                            'insuree__chf_id',
-                            flat=True
-                        )
+                        worker_group_currently_assigned.delete()
                         for insuree in insurees:
-                            if insuree.chf_id not in worker_group_currently_assigned:
-                                worker_group = WorkerGroup(
-                                    group_id=group_id,
-                                    insuree_id=insuree.id,
-                                )
-                                worker_group.save(user=self.user)
-                            else:
-                                worker_group = WorkerGroup.objects.get(Q(group_id=group.id, insuree_id=insuree.id))
-                                worker_group.date_valid_to = None
-                                worker_group.is_deleted = False
-                                worker_group.save(user=self.user)
+                            worker_group = WorkerGroup(
+                                group_id=group_id,
+                                insuree_id=insuree.id,
+                            )
+                            worker_group.save(user=self.user)
                 else:
                     group = GroupOfWorker(**obj_data)
                     group.save(user=self.user)
