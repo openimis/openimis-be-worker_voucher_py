@@ -92,6 +92,7 @@ class OnlineWorkerDataGQLType(graphene.ObjectType):
 
 
 class GroupOfWorkerGQLType(DjangoObjectType):
+    uuid = graphene.String(source='uuid')
 
     class Meta:
         model = GroupOfWorker
@@ -105,6 +106,8 @@ class GroupOfWorkerGQLType(DjangoObjectType):
 
 
 class WorkerGroupGQLType(DjangoObjectType):
+    uuid = graphene.String(source='uuid')
+
     class Meta:
         model = WorkerGroup
         interfaces = (graphene.relay.Node,)
