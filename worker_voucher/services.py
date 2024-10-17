@@ -601,10 +601,10 @@ class GroupOfWorkerService(BaseService):
                                 )
                                 worker_group.save(user=self.user)
                             else:
-                                role_right = WorkerGroup.objects.get(Q(group_id=group.id, insuree_id=insuree.id))
-                                role_right.date_valid_to = None
-                                role_right.is_deleted = False
-                                role_right.save(user=self.user)
+                                worker_group = WorkerGroup.objects.get(Q(group_id=group.id, insuree_id=insuree.id))
+                                worker_group.date_valid_to = None
+                                worker_group.is_deleted = False
+                                worker_group.save(user=self.user)
                 else:
                     group = GroupOfWorker(**obj_data)
                     group.save(user=self.user)

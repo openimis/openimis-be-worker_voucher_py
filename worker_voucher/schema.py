@@ -93,14 +93,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         orderBy=graphene.List(of_type=graphene.String),
         is_system=graphene.Boolean(),
         insuree_id=graphene.Int(),
-        system_role_id=graphene.Int(),
         client_mutation_id=graphene.String(),
-        str=graphene.String(description="Text search on any field")
-    )
-
-    worker_group = OrderedDjangoFilterConnectionField(
-        WorkerGroupGQLType,
-        orderBy=graphene.List(of_type=graphene.String),
     )
 
     def resolve_worker(self, info, client_mutation_id=None, economic_unit_code=None, **kwargs):
