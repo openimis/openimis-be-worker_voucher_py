@@ -622,12 +622,10 @@ class GroupOfWorkerService(BaseService):
     def delete(self, group_id, eu_uuid):
         try:
             with transaction.atomic():
-                import datetime
-                now = datetime.datetime.now()
                 gow = GroupOfWorker.objects.filter(
                     id=group_id,
-                    policy_holder__uuid=eu_uuid,
-                    policy_holder__is_deleted=False,
+                    policyholder__uuid=eu_uuid,
+                    policyholder__is_deleted=False,
                     is_deleted=False,
                 ).first()
 
@@ -635,14 +633,17 @@ class GroupOfWorkerService(BaseService):
                     return [{"message": _("worker_voucher.validation.group_of_worker_not_exists"), "detail": group_id}]
 
                 worker_group = WorkerGroup.objects.filter(
-                    group_of_worker__id=group_id,
-                    group_of_worker__policy_holder__uuid=eu_uuid,
-                    policy_holder__is_deleted=False,
+                    group__id=group_id,
+                    group__policyholder__uuid=eu_uuid,
+                    group__policyholder__is_deleted=False,
                     is_deleted=False,
                 )
+                print(worker_group)
                 worker_group.delete()
                 gow.delete(user=self.user)
+                return []
         except Exception as exc:
+            print(exc)
             return output_exception(model_name=self.OBJECT_TYPE.__name__, method="delete", exception=exc)
 
 

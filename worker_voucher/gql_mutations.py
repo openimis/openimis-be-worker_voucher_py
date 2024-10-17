@@ -431,7 +431,7 @@ class DeleteGroupOfWorkerMutation(BaseMutation):
     """
         Delete a chosen group of worker
     """
-    _mutation_module = "core"
+    _mutation_module = "worker_voucher"
     _mutation_class = "DeleteGroupOfWorkerMutation"
 
     class Input(OpenIMISMutation.Input):

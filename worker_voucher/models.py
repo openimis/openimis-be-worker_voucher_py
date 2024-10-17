@@ -54,7 +54,7 @@ class WorkerUpload(HistoryModel):
 
 
 class GroupOfWorker(HistoryModel):
-    name = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=50)
     policyholder = models.ForeignKey(PolicyHolder, models.DO_NOTHING, null=True, blank=True)
 
     @classmethod
