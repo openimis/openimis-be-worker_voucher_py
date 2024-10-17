@@ -13,6 +13,11 @@ from django.utils.translation import gettext as _
 from core import datetime
 from core.models import InteractiveUser, User
 from core.services import BaseService
+from core.services.utils import (
+    output_exception,
+    model_representation,
+    output_result_success
+)
 from core.signals import register_service_signal
 from insuree.models import Insuree
 from insuree.gql_mutations import update_or_create_insuree
@@ -22,7 +27,7 @@ from policyholder.models import PolicyHolder, PolicyHolderInsuree
 from policyholder.services import PolicyHolderInsuree as PolicyHolderInsureeService
 from msystems.services.mconnect_worker_service import MConnectWorkerService
 from worker_voucher.apps import WorkerVoucherConfig
-from worker_voucher.models import WorkerVoucher
+from worker_voucher.models import WorkerVoucher, GroupOfWorker, WorkerGroup
 from worker_voucher.validation import WorkerVoucherValidation
 
 logger = logging.getLogger(__name__)
@@ -73,6 +78,16 @@ def get_voucher_user_filters(user: InteractiveUser) -> Iterable[Q]:
         policyholder__policyholderuser__user__validity_to__isnull=True,
         policyholder__policyholderuser__user__i_user__validity_to__isnull=True,
     )] if not user.user.has_perms(WorkerVoucherConfig.gql_worker_voucher_search_all_perms) else []
+
+
+def get_group_worker_user_filters(user: InteractiveUser) -> Iterable[Q]:
+    return [Q(
+        policyholder__policyholderuser__user__i_user=user.i_user,
+        policyholder__is_deleted=False,
+        policyholder__policyholderuser__is_deleted=False,
+        policyholder__policyholderuser__user__validity_to__isnull=True,
+        policyholder__policyholderuser__user__i_user__validity_to__isnull=True,
+    )] if user.has_perms(WorkerVoucherConfig.gql_group_of_worker_search_perms) else []
 
 
 def validate_acquire_unassigned_vouchers(user: User, eu_code: str, count: Union[int, str]) -> Dict:
@@ -550,6 +565,97 @@ class WorkerUploadService:
         else:
             errors.append({"message": _("workers.validation.worker_already_assigned_to_unit")})
         return errors
+
+
+class GroupOfWorkerService(BaseService):
+    OBJECT_TYPE = GroupOfWorker
+
+    def __init__(self, user, validation_class=None):
+        super().__init__(user, validation_class)
+
+    @register_service_signal('group_of_worker_service.create_or_update')
+    def create_or_update(self, obj_data, eu_code):
+        try:
+            with transaction.atomic():
+                import datetime
+                now = datetime.datetime.now()
+                group_id = obj_data.pop('id') if 'id' in obj_data else None
+                insurees_chf_id = obj_data.pop('insurees_chf_id') if "insurees_chf_id" in obj_data else None
+                insurees = _check_insurees(insurees_chf_id, eu_code, self.user)
+                if group_id:
+                    group = GroupOfWorker.objects.get(id=group_id)
+                    [setattr(group, k, v) for k, v in obj_data.items()]
+                    group.save(user=self.user)
+                    if insurees is not None:
+                        worker_group_currently_assigned = WorkerGroup.objects.filter(group=group_id)
+                        worker_group_currently_assigned.update(date_valid_to=now, is_deleted=True)
+                        worker_group_currently_assigned = worker_group_currently_assigned.values_list(
+                            'insuree__chf_id',
+                            flat=True
+                        )
+                        for insuree in insurees:
+                            if insuree.chf_id not in worker_group_currently_assigned:
+                                worker_group = WorkerGroup(
+                                    group_id=group_id,
+                                    insuree_id=insuree.id,
+                                )
+                                worker_group.save(user=self.user)
+                            else:
+                                role_right = WorkerGroup.objects.get(Q(group_id=group.id, insuree_id=insuree.id))
+                                role_right.date_valid_to = None
+                                role_right.is_deleted = False
+                                role_right.save(user=self.user)
+                else:
+                    group = GroupOfWorker(**obj_data)
+                    group.save(user=self.user)
+                    if insurees:
+                        for insuree in insurees:
+                            worker_group = WorkerGroup(
+                                **{
+                                    "group_id": group.id,
+                                    "insuree_id": insuree.id
+                                }
+                            )
+                            worker_group.save(user=self.user)
+                dict_repr = model_representation(group)
+                return output_result_success(dict_representation=dict_repr)
+        except Exception as exc:
+            return output_exception(model_name=self.OBJECT_TYPE.__name__, method="create_or_update", exception=exc)
+
+    @register_service_signal('group_of_worker_service.create')
+    def create(self, obj_data):
+        raise NotImplementedError()
+
+    @register_service_signal('group_of_worker_service.update')
+    def update(self, obj_data):
+        raise NotImplementedError()
+
+    @register_service_signal('group_of_worker_service.delete')
+    def delete(self, group_id, eu_uuid):
+        try:
+            with transaction.atomic():
+                import datetime
+                now = datetime.datetime.now()
+                gow = GroupOfWorker.objects.filter(
+                    id=group_id,
+                    policy_holder__uuid=eu_uuid,
+                    policy_holder__is_deleted=False,
+                    is_deleted=False,
+                ).first()
+
+                if not gow:
+                    return [{"message": _("worker_voucher.validation.group_of_worker_not_exists"), "detail": group_id}]
+
+                worker_group = WorkerGroup.objects.filter(
+                    group_of_worker__id=group_id,
+                    group_of_worker__policy_holder__uuid=eu_uuid,
+                    policy_holder__is_deleted=False,
+                    is_deleted=False,
+                )
+                worker_group.delete()
+                gow.delete(user=self.user)
+        except Exception as exc:
+            return output_exception(model_name=self.OBJECT_TYPE.__name__, method="delete", exception=exc)
 
 
 def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:

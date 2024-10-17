@@ -16,7 +16,7 @@ from policyholder.models import PolicyHolder, PolicyHolderInsuree
 from policyholder.services import PolicyHolderInsuree as PolicyHolderInsureeService
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher
-from worker_voucher.services import WorkerVoucherService, validate_acquire_unassigned_vouchers, \
+from worker_voucher.services import WorkerVoucherService, GroupOfWorkerService, validate_acquire_unassigned_vouchers, \
     validate_acquire_assigned_vouchers, validate_assign_vouchers, create_assigned_voucher, create_voucher_bill, \
     create_unassigned_voucher, assign_voucher, economic_unit_user_filter, check_existing_active_vouchers
 
@@ -379,3 +379,95 @@ class AssignVouchersMutation(BaseMutation):
 
     class Input(AssignVouchersMutationInput):
         pass
+
+
+class CreateOrUpdateGroupOfWorkerMutation(BaseMutation):
+    """
+    Create a new group of worker or update existing group
+    """
+    _mutation_module = "worker_voucher"
+    _mutation_class = "CreateOrUpdateGroupOfWorkerMutation"
+
+    class Input(OpenIMISMutation.Input):
+        id = graphene.UUID(required=False)
+        name = graphene.String(required=True, max_length=50)
+        economic_unit_code = graphene.String(required=True)
+        insurees_chf_id = graphene.List(graphene.String, required=True)
+
+    @classmethod
+    def _validate_mutation(cls, user, **data):
+        if type(user) is AnonymousUser or not user.id or not user.has_perms(
+                WorkerVoucherConfig.gql_worker_voucher_acquire_assigned_perms):
+            raise ValidationError("mutation.authentication_required")
+
+    @classmethod
+    def _mutate(cls, user, **data):
+        try:
+            data.pop('client_mutation_id', None)
+            data.pop('client_mutation_label', None)
+            eu_code = data.pop('economic_unit_code', None)
+            eu_uuid = (PolicyHolder.objects
+                       .filter(economic_unit_user_filter(user), code=eu_code)
+                       .values_list('uuid', flat=True)
+                       .first())
+            if not eu_uuid:
+                return [{"message": _("worker_voucher.validation.economic_unit_not_exists")}]
+            with transaction.atomic():
+                data['policyholder_id'] = eu_uuid
+                service = GroupOfWorkerService(user)
+                result = service.create_or_update(data, eu_code)
+                if not result.get("success"):
+                    return result
+            return None
+        except Exception as exc:
+            return [
+                {
+                    'message': "worker_voucher.mutation.failed_to_create_or_update_group_of_worker",
+                    'detail': str(exc)
+                }]
+
+
+class DeleteGroupOfWorkerMutation(BaseMutation):
+    """
+        Delete a chosen group of worker
+    """
+    _mutation_module = "core"
+    _mutation_class = "DeleteGroupOfWorkerMutation"
+
+    class Input(OpenIMISMutation.Input):
+        uuid = graphene.String(required=False)
+        uuids = graphene.List(graphene.String, required=False)
+        economic_unit_code = graphene.String(required=True)
+
+    @classmethod
+    def _validate_mutation(cls, user, **data):
+        if type(user) is AnonymousUser or not user.id or not user.has_perms(
+                WorkerVoucherConfig.gql_group_of_worker_delete_perms):
+            raise ValidationError("mutation.authentication_required")
+
+    @classmethod
+    def _mutate(cls, user, uuid=None, uuids=None, economic_unit_code=None, **data):
+        uuids_to_delete = [uuid] if uuid else uuids
+        if not uuids_to_delete:
+            return [{"message": _("workers.validation.no_group_of_workers_to_delete")}]
+
+        eu_uuid = (PolicyHolder.objects
+                   .filter(economic_unit_user_filter(user), code=economic_unit_code)
+                   .values_list('uuid', flat=True)
+                   .first())
+
+        if not eu_uuid:
+            return [{"message": _("worker_voucher.validation.economic_unit_not_exists")}]
+
+        errors = []
+        service = GroupOfWorkerService(user)
+        try:
+            with transaction.atomic():
+                for group_id in uuids_to_delete:
+                    errors += service.delete(group_id, eu_uuid)
+                    if errors:
+                        raise ValueError("Errors during mutation")
+        except ValueError:
+            pass
+
+        return errors
