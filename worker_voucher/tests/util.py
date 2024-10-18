@@ -6,6 +6,7 @@ from django.apps import AppConfig
 
 from insuree.models import Insuree
 from policyholder.models import PolicyHolder, PolicyHolderUser, PolicyHolderInsuree
+from worker_voucher.models import GroupOfWorker
 
 
 def create_test_eu(user, code='test_eu'):
@@ -96,3 +97,12 @@ class OverrideAppConfig(ContextDecorator):
     def __exit__(self, exc_type, exc_val, exc_tb):
         for key in self.original_config:
             setattr(self.config_class, key, self.original_config[key])
+
+
+def create_test_group_of_worker(user, eu, name):
+    group = GroupOfWorker(
+        name=name,
+        eu=eu,
+    )
+    group.save(user=user)
+    return group

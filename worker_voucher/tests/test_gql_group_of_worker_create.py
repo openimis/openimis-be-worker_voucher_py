@@ -31,7 +31,7 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
         cls.chf_id = F"{generate_random_insuree_number()}"
         cls.existing_worker = create_test_worker(cls.user, chf_id=F"{generate_random_insuree_number()}")
         cls.name = 'Group Test'
-        cls.insurees_chf_id = [cls.existing_worker.chf_id]
+        cls.insurees_chf_id = [f"{cls.existing_worker.chf_id}"]
 
         gql_schema = Schema(
             query=Query,
