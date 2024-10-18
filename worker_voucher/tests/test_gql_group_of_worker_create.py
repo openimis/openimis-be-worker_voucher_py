@@ -22,15 +22,14 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
     user = None
     eu = None
     chf_id = None
-    insurees_chf_id = None
     name = None
 
     @classmethod
     def setUpClass(cls):
         super(GQLGroupOfWorkerCreateTestCase, cls).setUpClass()
         role_employer = Role.objects.get(name='Employer', validity_to__isnull=True)
-        cls.user = create_test_interactive_user(username='VoucherTestUser1', roles=[role_employer.id])
-        cls.eu = create_test_eu_for_user(cls.user)
+        cls.user = create_test_interactive_user(username='VoucherTestUser2', roles=[role_employer.id])
+        cls.eu = create_test_eu_for_user(cls.user, code='test_eu2')
         cls.chf_id = F"{generate_random_insuree_number()}"
         cls.existing_worker = create_test_worker(cls.user, chf_id=F"{generate_random_insuree_number()}")
         cls.name = 'Group Test'
@@ -78,7 +77,7 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
         InsureeConfig.reset_validation_settings()
         mutation_id = "39g453h5g92h04gh36"
         payload = gql_mutation_create_group_of_worker % (
-            self.insurees_chf_id,
+            self.chf_id,
             'NOT-EXISTS',
             self.name,
             mutation_id
