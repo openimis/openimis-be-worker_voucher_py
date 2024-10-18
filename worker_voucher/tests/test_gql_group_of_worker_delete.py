@@ -89,13 +89,40 @@ class GQLGroupOfWorkerDeleteTestCase(TestCase):
             mutation_id
         )
 
-        self.gql_client.execute(mutation, context=self.gql_context2)
+        self.gql_client.execute(mutation, context=self.gql_context)
         self._assert_mutation_failed(mutation_id)
 
         group = GroupOfWorker.objects.filter(id=self.group.id, is_deleted=False)
         workers_group = WorkerGroup.objects.filter(group__id=self.group.id)
         self.assertEquals(group.count(), 1)
         self.assertEquals(workers_group.count(), 3)
+
+    def test_delete_worker_failed_no_group_not_exist(self):
+        InsureeConfig.reset_validation_settings()
+        group = GroupOfWorker.objects.filter(id=self.group.id, is_deleted=False)
+        workers_group = WorkerGroup.objects.filter(group__id=self.group.id)
+        self.assertEquals(group.count(), 1)
+        self.assertEquals(workers_group.count(), 3)
+        uuid_group_not_exist = "b47356b5-1423-4ca6-99e8-3b4b4642a640"
+        group2 = GroupOfWorker.objects.filter(id=uuid_group_not_exist, is_deleted=False)
+        self.assertEquals(group2.count(), 0)
+
+        mutation_id = uuid4()
+        mutation = gql_mutation_group_of_worker_delete % (
+            uuid_group_not_exist,
+            self.eu.code,
+            mutation_id
+        )
+
+        self.gql_client.execute(mutation, context=self.gql_context)
+        self._assert_mutation_failed(mutation_id)
+
+        group = GroupOfWorker.objects.filter(id=self.group.id, is_deleted=False)
+        workers_group = WorkerGroup.objects.filter(group__id=self.group.id)
+        self.assertEquals(group.count(), 1)
+        self.assertEquals(workers_group.count(), 3)
+        group2 = GroupOfWorker.objects.filter(id=uuid_group_not_exist, is_deleted=False)
+        self.assertEquals(group2.count(), 0)
 
     def _assert_mutation_success(self, mutation_id):
         mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
