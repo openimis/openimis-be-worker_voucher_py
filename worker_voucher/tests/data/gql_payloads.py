@@ -77,7 +77,7 @@ mutation deleteWorker {
 gql_mutation_create_group_of_worker = """
 mutation addGroupOfWorker {
   createOrUpdateGroupOfWorkers(input: {
-    insureesChfId: "%s",
+    insureesChfId: %s,
     economicUnitCode: "%s",
     name: "%s",
     clientMutationId: "%s"
@@ -91,7 +91,7 @@ gql_mutation_update_group_of_worker = """
 mutation updateGroupOfWorker {
   createOrUpdateGroupOfWorkers(input: {
     id: "%s",
-    insureesChfId: "%s",
+    insureesChfId: %s,
     economicUnitCode: "%s",
     name: "%s",
     clientMutationId: "%s"
