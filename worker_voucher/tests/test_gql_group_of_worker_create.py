@@ -89,7 +89,7 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
         )
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
-        self._assert_mutation_false(mutation_id)
+        self._assert_mutation_failed(mutation_id)
         group = GroupOfWorker.objects.filter(name=self.name)
         self.assertEquals(group.count(), 0)
 
@@ -105,10 +105,9 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
         )
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
-        self._assert_mutation_false(mutation_id)
+        self._assert_mutation_failed(mutation_id)
         group = GroupOfWorker.objects.filter(name=self.name)
         self.assertEquals(group.count(), 0)
-
 
     def _assert_mutation_success(self, mutation_id):
         mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)

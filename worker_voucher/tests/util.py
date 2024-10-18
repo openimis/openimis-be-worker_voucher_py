@@ -6,7 +6,7 @@ from django.apps import AppConfig
 
 from insuree.models import Insuree
 from policyholder.models import PolicyHolder, PolicyHolderUser, PolicyHolderInsuree
-from worker_voucher.models import GroupOfWorker
+from worker_voucher.models import GroupOfWorker, WorkerGroup
 
 
 def create_test_eu(user, code='test_eu'):
@@ -106,3 +106,12 @@ def create_test_group_of_worker(user, eu, name):
     )
     group.save(user=user)
     return group
+
+
+def create_test_worker_group(user, insuree, group):
+    worker_group = WorkerGroup(
+        group=group,
+        insuree=insuree,
+    )
+    worker_group.save(user=user)
+    return worker_group

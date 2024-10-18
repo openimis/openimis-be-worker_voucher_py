@@ -127,3 +127,15 @@ mutation updateGroupOfWorker {
   }
 }
 """
+
+gql_mutation_group_of_worker_delete = """
+mutation deleteGroupOfWorker {
+  deleteGroupOfWorkers(input: {
+    uuid: "%s"
+    economicUnitCode: "%s"
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""

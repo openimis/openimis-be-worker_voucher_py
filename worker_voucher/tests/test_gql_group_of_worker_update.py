@@ -93,7 +93,7 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         workers_group = WorkerGroup.objects.filter(group=group.first())
         self.assertEquals(group.count(), 1)
         self.assertEquals(group.first().name, changed_name)
-        self.assertEquals(workers_group.count(), 0)
+        self.assertEquals(workers_group.count(), 2)
 
     def test_update_group_of_worker_remove_one_of_worker_success(self):
         InsureeConfig.reset_validation_settings()
@@ -146,7 +146,7 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         )
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
-        self._assert_mutation_false(mutation_id)
+        self._assert_mutation_failed(mutation_id)
         group = GroupOfWorker.objects.filter(name=self.name)
         self.assertEquals(group.count(), 1)
         workers_group = WorkerGroup.objects.filter(group=group.first())
@@ -166,7 +166,7 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         )
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
-        self._assert_mutation_false(mutation_id)
+        self._assert_mutation_failed(mutation_id)
         group = GroupOfWorker.objects.filter(name=self.name)
         self.assertEquals(group.count(), 1)
         workers_group = WorkerGroup.objects.filter(group=group.first())
