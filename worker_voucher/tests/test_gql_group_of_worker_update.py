@@ -13,7 +13,7 @@ from worker_voucher.tests.data.gql_payloads import (
 )
 from worker_voucher.tests.util import (
     create_test_eu_for_user,
-    create_test_worker,
+    create_test_worker_for_eu,
     create_test_group_of_worker
 )
 
@@ -38,8 +38,8 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         cls.user = create_test_interactive_user(username='VoucherTestUser3', roles=[role_employer.id])
         cls.eu = create_test_eu_for_user(cls.user, code='test_eu3')
         cls.chf_id = F"{generate_random_insuree_number()}"
-        cls.existing_worker = create_test_worker(cls.user, chf_id=F"{generate_random_insuree_number()}")
-        cls.existing_worker2 = create_test_worker(cls.user, chf_id=F"{generate_random_insuree_number()}")
+        cls.existing_worker = create_test_worker_for_eu(cls.user, cls.eu, chf_id=F"{generate_random_insuree_number()}")
+        cls.existing_worker2 = create_test_worker_for_eu(cls.user, cls.eu, chf_id=F"{generate_random_insuree_number()}")
         cls.name = 'Group Test Update'
 
         gql_schema = Schema(
