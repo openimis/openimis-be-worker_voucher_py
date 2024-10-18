@@ -8,8 +8,8 @@ from insuree.test_helpers import generate_random_insuree_number
 from insuree.apps import InsureeConfig
 from worker_voucher.schema import Query, Mutation
 from worker_voucher.tests.data.gql_payloads import (
-    gql_mutation_update_group_of_worker,
-    gql_mutation_create_group_of_worker
+    gql_mutation_update_group_of_worker_single,
+    gql_mutation_update_group_of_worker_multiple
 )
 from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker
 
@@ -35,10 +35,6 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         cls.existing_worker = create_test_worker(cls.user, chf_id=F"{generate_random_insuree_number()}")
         cls.existing_worker2 = create_test_worker(cls.user, chf_id=F"{generate_random_insuree_number()}")
         cls.name = 'Group Test'
-        cls.insurees_chf_id = [
-             f"{cls.existing_worker.chf_id}",
-             f"{cls.existing_worker2.chf_id}"
-        ]
 
         gql_schema = Schema(
             query=Query,
@@ -52,8 +48,10 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
     def test_update_group_of_worker_success(self):
         InsureeConfig.reset_validation_settings()
         mutation_id = "93g453h5g77h04gh01"
-        payload = gql_mutation_update_group_of_worker % (
+        payload = gql_mutation_update_group_of_worker_multiple % (
             self.group.id,
+            self.existing_worker.chf_id,
+            self.existing_worker2.chf_id,
             self.insurees_chf_id,
             self.eu.code,
             self.name,
@@ -73,9 +71,10 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         InsureeConfig.reset_validation_settings()
         mutation_id = "93g453h5g77h04gh00"
         changed_name = 'ChangedName'
-        payload = gql_mutation_update_group_of_worker % (
+        payload = gql_mutation_update_group_of_worker_multiple % (
             self.group.id,
-            [],
+            self.existing_worker.chf_id,
+            self.existing_worker2.chf_id,
             self.eu.code,
             changed_name,
             mutation_id
@@ -93,8 +92,10 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
     def test_update_group_of_worker_remove_one_of_worker_success(self):
         InsureeConfig.reset_validation_settings()
         mutation_id = "93g453h5g77h04gh01"
-        payload = gql_mutation_create_group_of_worker % (
-            self.insurees_chf_id,
+        payload = gql_mutation_update_group_of_worker_multiple % (
+            self.group.id,
+            self.existing_worker.chf_id,
+            self.existing_worker2.chf_id,
             self.eu.code,
             self.name,
             mutation_id
@@ -110,9 +111,9 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         self.assertEquals(workers_group.count(), 2)
 
         mutation_id = "93g453h5g77h04gh09"
-        payload = gql_mutation_update_group_of_worker % (
+        payload = gql_mutation_update_group_of_worker_single % (
             self.group.id,
-            [self.existing_worker.chf_id],
+            self.existing_worker.chf_id,
             self.eu.code,
             self.name,
             mutation_id
@@ -129,9 +130,9 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
     def test_update_group_of_worker_false_not_existing_economic_unit(self):
         InsureeConfig.reset_validation_settings()
         mutation_id = "39g453h5g92h04gh03"
-        payload = gql_mutation_update_group_of_worker % (
+        payload = gql_mutation_update_group_of_worker_single % (
             self.group.id,
-            self.insurees_chf_id,
+            self.existing_worker.chf_id,
             'NOT-EXISTS',
             self.name,
             mutation_id
@@ -148,9 +149,9 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         InsureeConfig.reset_validation_settings()
         mutation_id = "19g453h5g92h04gh04"
         national_id = F"{generate_random_insuree_number()}"
-        payload = gql_mutation_update_group_of_worker % (
+        payload = gql_mutation_update_group_of_worker_single % (
             self.group.id,
-            [national_id],
+            national_id,
             self.eu.code,
             self.name,
             mutation_id
