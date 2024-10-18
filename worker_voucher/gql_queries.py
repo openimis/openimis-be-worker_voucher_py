@@ -101,6 +101,10 @@ class GroupOfWorkerGQLType(DjangoObjectType):
             "id": ["exact"],
             "name": ["exact", "istartswith", "icontains", "iexact"],
             **prefix_filterset("policyholder__", PolicyHolderGQLType._meta.filter_fields),
+
+            "date_created": ["exact", "lt", "lte", "gt", "gte"],
+            "date_updated": ["exact", "lt", "lte", "gt", "gte"],
+            "is_deleted": ["exact"],
         }
         connection_class = ExtendedConnection
 
@@ -115,5 +119,9 @@ class WorkerGroupGQLType(DjangoObjectType):
             "id": ["exact"],
             "insuree_id": ["exact"],
             **prefix_filterset("group__", GroupOfWorkerGQLType._meta.filter_fields),
+
+            "date_created": ["exact", "lt", "lte", "gt", "gte"],
+            "date_updated": ["exact", "lt", "lte", "gt", "gte"],
+            "is_deleted": ["exact"],
         }
         connection_class = ExtendedConnection

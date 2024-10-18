@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Iterable, Dict, Union, List
 from uuid import uuid4
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q, QuerySet, UUIDField, Count
 from django.db.models.functions import Cast
@@ -584,6 +585,11 @@ class GroupOfWorkerService(BaseService):
                 insurees = _check_insurees(insurees_chf_id, eu_code, self.user) if len(insurees_chf_id) > 0 else set()
                 if group_id:
                     group = GroupOfWorker.objects.get(id=group_id)
+                    if group.name != obj_data['name']:
+                        if GroupOfWorker.objects.filter(name=obj_data['name'], is_deleted=False).count() > 0:
+                            raise ValidationError(_("This name for group already exists."))
+                        [setattr(group, k, v) for k, v in obj_data.items()]
+                        group.save(user=self.user)
                     if insurees is not None:
                         worker_group_currently_assigned = WorkerGroup.objects.filter(group=group_id)
                         worker_group_currently_assigned.delete()
@@ -594,6 +600,8 @@ class GroupOfWorkerService(BaseService):
                             )
                             worker_group.save(user=self.user)
                 else:
+                    if GroupOfWorker.objects.filter(name=obj_data['name'], is_deleted=False).count() > 0:
+                        raise ValidationError(_("This name for group already exists."))
                     group = GroupOfWorker(**obj_data)
                     group.save(user=self.user)
                     if insurees:

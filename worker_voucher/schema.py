@@ -91,8 +91,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
     group_of_worker = OrderedDjangoFilterConnectionField(
         GroupOfWorkerGQLType,
         orderBy=graphene.List(of_type=graphene.String),
-        is_system=graphene.Boolean(),
-        insuree_id=graphene.Int(),
+        economic_unit_code=graphene.String(),
         client_mutation_id=graphene.String(),
     )
 
@@ -220,7 +219,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
             photo=online_result["data"]["Photo"]
         )
 
-    def resolve_group_of_worker(self, info, **kwargs):
+    def resolve_group_of_worker(self, info, economic_unit_code=None, **kwargs):
         if not info.context.user.has_perms(WorkerVoucherConfig.gql_group_of_worker_search_perms):
             raise PermissionError("Unauthorized")
         filters = []
@@ -229,7 +228,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         if client_mutation_id:
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
         filters.extend(get_group_worker_user_filters(info.context.user))
-        return gql_optimizer.query(query.filter(*filters), info)
+        return gql_optimizer.query(query.filter(*filters, policyholder__code=economic_unit_code), info)
 
     @staticmethod
     def _check_permissions(user, perms):
