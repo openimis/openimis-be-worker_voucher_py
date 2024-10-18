@@ -98,6 +98,6 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
             mutation_id
         )
 
-        _ = self.gql_client.execute(payload, context=self.gql_context))
+        _ = self.gql_client.execute(payload, context=self.gql_context)
         group = GroupOfWorker.objects.filter(name=self.name)
         self.assertEquals(group.count(), 0)
