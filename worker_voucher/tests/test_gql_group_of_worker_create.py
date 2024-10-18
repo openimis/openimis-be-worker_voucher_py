@@ -31,7 +31,7 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
         cls.chf_id = F"{generate_random_insuree_number()}"
         cls.existing_worker = create_test_worker(cls.user, chf_id=F"{generate_random_insuree_number()}")
         cls.name = 'Group Test'
-        cls.insurees_chf_id = [cls.chf_id]
+        cls.insurees_chf_id = [cls.existing_worker.chf_id]
 
         gql_schema = Schema(
             query=Query,
@@ -77,7 +77,7 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
         self.assertEquals(group.count(), 1)
         self.assertEquals(workers_group.count(), 0)
 
-    def test_create_worker_false_not_existing_economic_unit(self):
+    def test_create_group_of_worker_false_not_existing_economic_unit(self):
         InsureeConfig.reset_validation_settings()
         mutation_id = "39g453h5g92h04gh36"
         payload = gql_mutation_create_group_of_worker % (
@@ -93,7 +93,7 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
         group = GroupOfWorker.objects.filter(name=self.name)
         self.assertEquals(group.count(), 0)
 
-    def test_create_group_of_worker_insuree_not_exist(self):
+    def test_create_group_of_worker_false_insuree_not_exist(self):
         InsureeConfig.reset_validation_settings()
         mutation_id = "19g453h5g92h04gh99"
         national_id = F"{generate_random_insuree_number()}"
