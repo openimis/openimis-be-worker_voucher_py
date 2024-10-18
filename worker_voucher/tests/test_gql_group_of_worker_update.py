@@ -11,7 +11,11 @@ from worker_voucher.tests.data.gql_payloads import (
     gql_mutation_update_group_of_worker_single,
     gql_mutation_update_group_of_worker_multiple
 )
-from worker_voucher.tests.util import create_test_eu_for_user, create_test_worker
+from worker_voucher.tests.util import (
+    create_test_eu_for_user,
+    create_test_worker,
+    create_test_group_of_worker
+)
 
 
 class GQLGroupOfWorkerUpdateTestCase(TestCase):
@@ -43,7 +47,7 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
 
         cls.gql_client = Client(gql_schema)
         cls.gql_context = cls.GQLContext(cls.user)
-        cls.group = cls.create_test_group_of_worker(cls.user, cls.eu, cls.name)
+        cls.group = create_test_group_of_worker(cls.user, cls.eu, cls.name)
 
     def test_update_group_of_worker_success(self):
         InsureeConfig.reset_validation_settings()
