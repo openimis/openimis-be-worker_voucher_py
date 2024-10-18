@@ -646,12 +646,10 @@ class GroupOfWorkerService(BaseService):
                     group__policyholder__is_deleted=False,
                     is_deleted=False,
                 )
-                print(worker_group)
                 worker_group.delete()
                 gow.delete(user=self.user)
                 return []
         except Exception as exc:
-            print(exc)
             return output_exception(model_name=self.OBJECT_TYPE.__name__, method="delete", exception=exc)
 
 
