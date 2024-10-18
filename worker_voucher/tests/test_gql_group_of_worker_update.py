@@ -82,10 +82,13 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
             changed_name,
             mutation_id
         )
-
+        print(payload)
         workers_group = WorkerGroup.objects.filter(group=self.group)
         self.assertEquals(workers_group.count(), 0)
         _ = self.gql_client.execute(payload, context=self.gql_context)
+        print(_)
+        mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
+        print(mutation_log)
         group = GroupOfWorker.objects.filter(name=self.name)
         workers_group = WorkerGroup.objects.filter(group=group.first())
         self.assertEquals(group.count(), 1)
@@ -107,6 +110,8 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         workers_group = WorkerGroup.objects.filter(group=self.group)
         self.assertEquals(workers_group.count(), 0)
         _ = self.gql_client.execute(payload, context=self.gql_context)
+        mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
+        print(mutation_log)
         group = GroupOfWorker.objects.filter(name=self.name)
         workers_group = WorkerGroup.objects.filter(group=group.first())
         self.assertEquals(group.count(), 1)
@@ -123,6 +128,8 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         )
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
+        mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
+        print(mutation_log)
         group = GroupOfWorker.objects.filter(name=self.name)
         workers_group = WorkerGroup.objects.filter(group=group.first())
         self.assertEquals(group.count(), 1)

@@ -118,7 +118,7 @@ gql_mutation_update_group_of_worker_single = """
 mutation updateGroupOfWorker {
   createOrUpdateGroupOfWorkers(input: {
     id: "%s",
-    insureesChfId: ["%s", "%s"],
+    insureesChfId: ["%s"],
     economicUnitCode: "%s",
     name: "%s",
     clientMutationId: "%s"

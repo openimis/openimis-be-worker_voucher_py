@@ -51,9 +51,13 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
             self.name,
             mutation_id
         )
-
+        print(payload)
         _ = self.gql_client.execute(payload, context=self.gql_context)
+        print(_)
+        mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
+        print(mutation_log)
         group = GroupOfWorker.objects.filter(name=self.name)
+        print(group)
         workers_group = WorkerGroup.objects.filter(group=group.first())
         self.assertEquals(group.count(), 1)
         self.assertEquals(workers_group.count(), 1)
