@@ -102,7 +102,7 @@ class OverrideAppConfig(ContextDecorator):
 def create_test_group_of_worker(user, eu, name):
     group = GroupOfWorker(
         name=name,
-        eu=eu,
+        policyholder=eu,
     )
     group.save(user=user)
     return group
