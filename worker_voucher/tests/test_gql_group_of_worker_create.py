@@ -56,6 +56,8 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
         print(_)
         mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
         print(mutation_log)
+        print(mutation_log.error)
+        print(mutation_log.status)
         group = GroupOfWorker.objects.filter(name=self.name)
         print(group)
         workers_group = WorkerGroup.objects.filter(group=group.first())
