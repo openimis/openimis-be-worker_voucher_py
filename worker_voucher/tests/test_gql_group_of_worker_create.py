@@ -32,6 +32,7 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
         cls.eu = create_test_eu_for_user(cls.user, code='test_eu2')
         cls.chf_id = F"{generate_random_insuree_number()}"
         cls.existing_worker = create_test_worker(cls.user, chf_id=F"{generate_random_insuree_number()}")
+        print(cls.existing_worker, 'xxxxxx')
         cls.name = 'Group Test'
 
         gql_schema = Schema(
@@ -45,6 +46,7 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
     def test_create_group_of_worker_success(self):
         InsureeConfig.reset_validation_settings()
         mutation_id = "93g453h5g77h04gh35"
+        print(self.existing_worker, 'yyyyy')
         payload = gql_mutation_create_group_of_worker % (
             self.existing_worker.chf_id,
             self.eu.code,
