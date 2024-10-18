@@ -53,7 +53,7 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
         group = GroupOfWorker.objects.filter(name=self.name)
-        workers_group = WorkerGroup.objects.filter(group=group)
+        workers_group = WorkerGroup.objects.filter(group=group.first())
         self.assertEquals(group.count(), 1)
         self.assertEquals(workers_group.count(), 1)
 
@@ -69,7 +69,7 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
         group = GroupOfWorker.objects.filter(name=self.name)
-        workers_group = WorkerGroup.objects.filter(group=group)
+        workers_group = WorkerGroup.objects.filter(group=group.first())
         self.assertEquals(group.count(), 1)
         self.assertEquals(workers_group.count(), 0)
 
