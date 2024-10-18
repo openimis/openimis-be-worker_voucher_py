@@ -29,6 +29,7 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
     name = None
     existing_worker = None
     existing_worker2 = None
+    group = None
 
     @classmethod
     def setUpClass(cls):
