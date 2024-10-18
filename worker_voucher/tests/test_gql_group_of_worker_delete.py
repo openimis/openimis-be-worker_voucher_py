@@ -84,7 +84,7 @@ class GQLGroupOfWorkerDeleteTestCase(TestCase):
 
         mutation_id = uuid4()
         mutation = gql_mutation_group_of_worker_delete % (
-            self.worker.uuid,
+            self.group.uuid,
             'NOT-EXIST',
             mutation_id
         )
