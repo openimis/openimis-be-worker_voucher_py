@@ -66,6 +66,7 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         workers_group = WorkerGroup.objects.filter(group=self.group)
         self.assertEquals(workers_group.count(), 0)
         _ = self.gql_client.execute(payload, context=self.gql_context)
+        self._assert_mutation_success(mutation_id)
         group = GroupOfWorker.objects.filter(name=self.name)
         workers_group = WorkerGroup.objects.filter(group=group.first())
         self.assertEquals(group.count(), 1)
@@ -87,7 +88,8 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         workers_group = WorkerGroup.objects.filter(group=self.group)
         self.assertEquals(workers_group.count(), 0)
         _ = self.gql_client.execute(payload, context=self.gql_context)
-        group = GroupOfWorker.objects.filter(name=self.name)
+        self._assert_mutation_success(mutation_id)
+        group = GroupOfWorker.objects.filter(name=changed_name)
         workers_group = WorkerGroup.objects.filter(group=group.first())
         self.assertEquals(group.count(), 1)
         self.assertEquals(group.first().name, changed_name)
@@ -124,6 +126,7 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         )
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
+        self._assert_mutation_success(mutation_id)
         group = GroupOfWorker.objects.filter(name=self.name)
         workers_group = WorkerGroup.objects.filter(group=group.first())
         self.assertEquals(group.count(), 1)
@@ -143,6 +146,7 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         )
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
+        self._assert_mutation_false(mutation_id)
         group = GroupOfWorker.objects.filter(name=self.name)
         self.assertEquals(group.count(), 1)
         workers_group = WorkerGroup.objects.filter(group=group.first())
@@ -162,8 +166,19 @@ class GQLGroupOfWorkerUpdateTestCase(TestCase):
         )
 
         _ = self.gql_client.execute(payload, context=self.gql_context)
+        self._assert_mutation_false(mutation_id)
         group = GroupOfWorker.objects.filter(name=self.name)
         self.assertEquals(group.count(), 1)
         workers_group = WorkerGroup.objects.filter(group=group.first())
         self.assertEquals(group.first().name, self.name)
         self.assertEquals(workers_group.count(), 0)
+
+    def _assert_mutation_success(self, mutation_id):
+        mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
+        self.assertEquals(mutation_log.status, 2)
+        self.assertFalse(mutation_log.error)
+
+    def _assert_mutation_failed(self, mutation_id):
+        mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
+        self.assertEquals(mutation_log.status, 1)
+        self.assertTrue(mutation_log.error)
