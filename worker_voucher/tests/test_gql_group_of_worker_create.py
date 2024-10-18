@@ -23,6 +23,7 @@ class GQLGroupOfWorkerCreateTestCase(TestCase):
     eu = None
     chf_id = None
     name = None
+    existing_worker = None
 
     @classmethod
     def setUpClass(cls):
