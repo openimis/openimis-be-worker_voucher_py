@@ -227,8 +227,10 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         client_mutation_id = kwargs.get("client_mutation_id", None)
         if client_mutation_id:
             filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
+        if economic_unit_code:
+            filters.append(Q(policyholder__code=economic_unit_code))
         filters.extend(get_group_worker_user_filters(info.context.user))
-        return gql_optimizer.query(query.filter(*filters, policyholder__code=economic_unit_code), info)
+        return gql_optimizer.query(query.filter(*filters), info)
 
     @staticmethod
     def _check_permissions(user, perms):
