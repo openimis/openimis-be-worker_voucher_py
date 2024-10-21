@@ -66,7 +66,7 @@ def get_voucher_worker_enquire_filters(national_id: str) -> Iterable[Q]:
         policyholder__is_deleted=False,
         is_deleted=False,
         status=WorkerVoucher.Status.ASSIGNED,
-        assigned_date=today,
+        assigned_date__date=today,
         expiry_date__gte=today,
     )]
 
