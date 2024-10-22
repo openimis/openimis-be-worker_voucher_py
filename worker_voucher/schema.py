@@ -1,3 +1,5 @@
+import logging
+
 import graphene
 import graphene_django_optimizer as gql_optimizer
 
@@ -32,6 +34,8 @@ from worker_voucher.services import (
     worker_user_filter,
     get_group_worker_user_filters
 )
+
+logger = logging.getLogger(__name__)
 
 
 class Query(ExportableQueryMixin, graphene.ObjectType):
@@ -217,8 +221,10 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         online_result = MConnectWorkerService().fetch_worker_data(national_id, info.context.user, eu)
         if not online_result.get("success", False):
+            logger.error("Online worker data failed% %s", online_result)
             raise AttributeError(online_result.get("error", _("Unknown Error")))
 
+        logger.info("Online worker data: %s", online_result)
         return OnlineWorkerDataGQLType(
             other_names=online_result["data"]["GivenName"],
             last_name=online_result["data"]["FamilyName"],
