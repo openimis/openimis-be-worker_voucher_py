@@ -125,3 +125,11 @@ class WorkerGroupGQLType(DjangoObjectType):
             "is_deleted": ["exact"],
         }
         connection_class = ExtendedConnection
+
+
+class VoucherCheckGQLType(graphene.ObjectType):
+    is_existed = graphene.Boolean()
+    is_valid = graphene.Boolean()
+    assigned_date = graphene.DateTime()
+    employer_code = graphene.String()
+    employer_name = graphene.String()

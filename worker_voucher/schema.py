@@ -1,6 +1,7 @@
 import graphene
 import graphene_django_optimizer as gql_optimizer
 
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils.translation import gettext as _
 from django.contrib.auth.models import AnonymousUser
@@ -16,7 +17,7 @@ from msystems.services.mconnect_worker_service import MConnectWorkerService
 from policyholder.models import PolicyHolder
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.gql_queries import WorkerVoucherGQLType, AcquireVouchersValidationSummaryGQLType, WorkerGQLType, \
-    OnlineWorkerDataGQLType, GroupOfWorkerGQLType, WorkerGroupGQLType
+    OnlineWorkerDataGQLType, GroupOfWorkerGQLType, WorkerGroupGQLType, VoucherCheckGQLType
 from worker_voucher.gql_mutations import CreateWorkerVoucherMutation, UpdateWorkerVoucherMutation, \
     DeleteWorkerVoucherMutation, AcquireUnassignedVouchersMutation, AcquireAssignedVouchersMutation, \
     DateRangeInclusiveInputType, AssignVouchersMutation, CreateWorkerMutation, DeleteWorkerMutation, \
@@ -93,6 +94,11 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         orderBy=graphene.List(of_type=graphene.String),
         economic_unit_code=graphene.String(),
         client_mutation_id=graphene.String(),
+    )
+
+    voucher_check = graphene.Field(
+        VoucherCheckGQLType,
+        code=graphene.String(required=True),
     )
 
     def resolve_worker(self, info, client_mutation_id=None, economic_unit_code=None, **kwargs):
@@ -231,6 +237,45 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
             filters.append(Q(policyholder__code=economic_unit_code))
         filters.extend(get_group_worker_user_filters(info.context.user))
         return gql_optimizer.query(query.filter(*filters), info)
+
+    def resolve_voucher_check(self, info, code):
+        try:
+            from core import datetime
+            today = datetime.datetime.now()
+            voucher = WorkerVoucher.objects.filter(
+                code=code,
+                insuree__validity_to__isnull=True,
+                policyholder__is_deleted=False,
+                is_deleted=False,
+                expiry_date__gte=today,
+                status=WorkerVoucher.Status.ASSIGNED
+            ).first()
+            if not voucher:
+                return VoucherCheckGQLType(
+                    is_existed=False,
+                    is_valid=False,
+                    assigned_date=None,
+                    employer_code=None,
+                    employer_name=None,
+                )
+            if voucher.assigned_date.date() >= today.date():
+                return VoucherCheckGQLType(
+                    is_existed=True,
+                    is_valid=True,
+                    assigned_date=voucher.assigned_date,
+                    employer_code=voucher.policyholder.code,
+                    employer_name=voucher.policyholder.trade_name
+                )
+            else:
+                return VoucherCheckGQLType(
+                    is_existed=True,
+                    is_valid=False,
+                    assigned_date=voucher.assigned_date,
+                    employer_code=voucher.policyholder.code,
+                    employer_name=voucher.policyholder.trade_name
+                )
+        except Exception:
+            raise ValidationError(_("Unable to fetch voucher details"))
 
     @staticmethod
     def _check_permissions(user, perms):

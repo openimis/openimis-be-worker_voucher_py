@@ -139,3 +139,15 @@ mutation deleteGroupOfWorker {
   }
 }
 """
+
+gql_query_voucher_check = """
+query voucherCheck{
+  voucherCheck(code: "%s") {
+    isExisted
+    isValid
+    assignedDate
+    employerCode
+    employerName
+  }
+}
+"""
