@@ -6,7 +6,7 @@ from insuree.gql_queries import InsureeGQLType, PhotoGQLType, GenderGQLType
 from insuree.models import Insuree
 from invoice.models import Bill
 from policyholder.gql import PolicyHolderGQLType
-from worker_voucher.models import WorkerVoucher
+from worker_voucher.models import WorkerVoucher, GroupOfWorker, WorkerGroup
 from worker_voucher.services import get_worker_yearly_voucher_count_counts
 
 
@@ -89,3 +89,39 @@ class OnlineWorkerDataGQLType(graphene.ObjectType):
     other_names = graphene.String()
     last_name = graphene.String()
     photo = graphene.String()
+
+
+class GroupOfWorkerGQLType(DjangoObjectType):
+    uuid = graphene.String(source='uuid')
+
+    class Meta:
+        model = GroupOfWorker
+        interfaces = (graphene.relay.Node,)
+        filter_fields = {
+            "id": ["exact"],
+            "name": ["exact", "istartswith", "icontains", "iexact"],
+            **prefix_filterset("policyholder__", PolicyHolderGQLType._meta.filter_fields),
+
+            "date_created": ["exact", "lt", "lte", "gt", "gte"],
+            "date_updated": ["exact", "lt", "lte", "gt", "gte"],
+            "is_deleted": ["exact"],
+        }
+        connection_class = ExtendedConnection
+
+
+class WorkerGroupGQLType(DjangoObjectType):
+    uuid = graphene.String(source='uuid')
+
+    class Meta:
+        model = WorkerGroup
+        interfaces = (graphene.relay.Node,)
+        filter_fields = {
+            "id": ["exact"],
+            "insuree_id": ["exact"],
+            **prefix_filterset("group__", GroupOfWorkerGQLType._meta.filter_fields),
+
+            "date_created": ["exact", "lt", "lte", "gt", "gte"],
+            "date_updated": ["exact", "lt", "lte", "gt", "gte"],
+            "is_deleted": ["exact"],
+        }
+        connection_class = ExtendedConnection

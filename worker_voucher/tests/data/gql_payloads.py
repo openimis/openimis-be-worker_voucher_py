@@ -73,3 +73,69 @@ mutation deleteWorker {
   }
 }
 """
+
+gql_mutation_create_group_of_worker = """
+mutation addGroupOfWorker {
+  createOrUpdateGroupOfWorkers(input: {
+    insureesChfId: ["%s"],
+    economicUnitCode: "%s",
+    name: "%s",
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""
+
+gql_mutation_create_group_of_worker_empty = """
+mutation addGroupOfWorker {
+  createOrUpdateGroupOfWorkers(input: {
+    insureesChfId: [],
+    economicUnitCode: "%s",
+    name: "%s",
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""
+
+gql_mutation_update_group_of_worker_multiple = """
+mutation updateGroupOfWorker {
+  createOrUpdateGroupOfWorkers(input: {
+    id: "%s",
+    insureesChfId: ["%s", "%s"],
+    economicUnitCode: "%s",
+    name: "%s",
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""
+
+gql_mutation_update_group_of_worker_single = """
+mutation updateGroupOfWorker {
+  createOrUpdateGroupOfWorkers(input: {
+    id: "%s",
+    insureesChfId: ["%s"],
+    economicUnitCode: "%s",
+    name: "%s",
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""
+
+gql_mutation_group_of_worker_delete = """
+mutation deleteGroupOfWorker {
+  deleteGroupOfWorkers(input: {
+    uuid: "%s"
+    economicUnitCode: "%s"
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""
