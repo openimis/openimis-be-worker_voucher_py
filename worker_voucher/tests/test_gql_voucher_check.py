@@ -1,8 +1,9 @@
+from datetime import datetime
 from django.test import TestCase
 from graphene import Schema
 from graphene.test import Client
 
-from core import datetime
+
 from core.models import Role
 from core.test_helpers import create_test_interactive_user
 from worker_voucher.models import WorkerVoucher
