@@ -208,28 +208,35 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         return AcquireVouchersValidationSummaryGQLType(**validation_summary)
 
     def resolve_online_worker_data(self, info, national_id=None, economic_unit_code=None, **kwargs):
-        Query._check_permissions(info.context.user, InsureeConfig.gql_query_insuree_perms)
+        try:
+            logger.info("Online worker data: step 1" )
+            Query._check_permissions(info.context.user, InsureeConfig.gql_query_insuree_perms)
 
-        eu = PolicyHolder.objects.filter(economic_unit_user_filter(info.context.user), code=economic_unit_code).first()
-        if not eu:
-            return [{"message": _("workers.validation.economic_unit_not_exist")}]
+            logger.info("Online worker data: step 2")
+            eu = PolicyHolder.objects.filter(economic_unit_user_filter(info.context.user), code=economic_unit_code).first()
+            if not eu:
+                return [{"message": _("workers.validation.economic_unit_not_exist")}]
 
-        if InsureeConfig.get_insuree_number_validator():
-            errors = custom_insuree_number_validation(national_id)
-            if errors:
-                return errors
+            logger.info("Online worker data: step 3")
+            if InsureeConfig.get_insuree_number_validator():
+                errors = custom_insuree_number_validation(national_id)
+                if errors:
+                    return errors
 
-        online_result = MConnectWorkerService().fetch_worker_data(national_id, info.context.user, eu)
-        if not online_result.get("success", False):
-            logger.error("Online worker data failed% %s", online_result)
-            raise AttributeError(online_result.get("error", _("Unknown Error")))
+            logger.info("Online worker data: step 4")
+            online_result = MConnectWorkerService().fetch_worker_data(national_id, info.context.user, eu)
+            if not online_result.get("success", False):
+                logger.error("Online worker data failed% %s", online_result)
+                raise AttributeError(online_result.get("error", _("Unknown Error")))
 
-        logger.info("Online worker data: %s", online_result)
-        return OnlineWorkerDataGQLType(
+            logger.info("Online worker data: %s", online_result)
+            return OnlineWorkerDataGQLType(
             other_names=online_result["data"]["GivenName"],
             last_name=online_result["data"]["FamilyName"],
             photo=online_result["data"]["Photo"]
-        )
+            )
+        except Exception as e:
+            logger.error("Error", exc_info=e)
 
     def resolve_group_of_worker(self, info, economic_unit_code=None, **kwargs):
         if not info.context.user.has_perms(WorkerVoucherConfig.gql_group_of_worker_search_perms):
