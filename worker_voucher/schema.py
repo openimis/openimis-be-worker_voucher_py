@@ -16,13 +16,21 @@ from msystems.services.mconnect_worker_service import MConnectWorkerService
 from policyholder.models import PolicyHolder
 from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.gql_queries import WorkerVoucherGQLType, AcquireVouchersValidationSummaryGQLType, WorkerGQLType, \
-    OnlineWorkerDataGQLType
+    OnlineWorkerDataGQLType, GroupOfWorkerGQLType, WorkerGroupGQLType
 from worker_voucher.gql_mutations import CreateWorkerVoucherMutation, UpdateWorkerVoucherMutation, \
     DeleteWorkerVoucherMutation, AcquireUnassignedVouchersMutation, AcquireAssignedVouchersMutation, \
-    DateRangeInclusiveInputType, AssignVouchersMutation, CreateWorkerMutation, DeleteWorkerMutation
-from worker_voucher.models import WorkerVoucher
-from worker_voucher.services import get_voucher_worker_enquire_filters, validate_acquire_unassigned_vouchers, \
-    validate_acquire_assigned_vouchers, validate_assign_vouchers, economic_unit_user_filter, worker_user_filter
+    DateRangeInclusiveInputType, AssignVouchersMutation, CreateWorkerMutation, DeleteWorkerMutation, \
+    CreateOrUpdateGroupOfWorkerMutation, DeleteGroupOfWorkerMutation
+from worker_voucher.models import WorkerVoucher, GroupOfWorker, WorkerGroup
+from worker_voucher.services import (
+    get_voucher_worker_enquire_filters,
+    validate_acquire_unassigned_vouchers,
+    validate_acquire_assigned_vouchers,
+    validate_assign_vouchers,
+    economic_unit_user_filter,
+    worker_user_filter,
+    get_group_worker_user_filters
+)
 
 
 class Query(ExportableQueryMixin, graphene.ObjectType):
@@ -78,6 +86,13 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         OnlineWorkerDataGQLType,
         national_id=graphene.String(),
         economic_unit_code=graphene.ID(),
+    )
+
+    group_of_worker = OrderedDjangoFilterConnectionField(
+        GroupOfWorkerGQLType,
+        orderBy=graphene.List(of_type=graphene.String),
+        economic_unit_code=graphene.String(),
+        client_mutation_id=graphene.String(),
     )
 
     def resolve_worker(self, info, client_mutation_id=None, economic_unit_code=None, **kwargs):
@@ -204,6 +219,17 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
             photo=online_result["data"]["Photo"]
         )
 
+    def resolve_group_of_worker(self, info, economic_unit_code=None, **kwargs):
+        if not info.context.user.has_perms(WorkerVoucherConfig.gql_group_of_worker_search_perms):
+            raise PermissionError("Unauthorized")
+        filters = []
+        query = GroupOfWorker.objects
+        client_mutation_id = kwargs.get("client_mutation_id", None)
+        if client_mutation_id:
+            filters.append(Q(mutations__mutation__client_mutation_id=client_mutation_id))
+        filters.extend(get_group_worker_user_filters(info.context.user))
+        return gql_optimizer.query(query.filter(*filters, policyholder__code=economic_unit_code), info)
+
     @staticmethod
     def _check_permissions(user, perms):
         if type(user) is AnonymousUser or not user.id or not user.has_perms(perms):
@@ -221,3 +247,6 @@ class Mutation(graphene.ObjectType):
     acquire_unassigned_vouchers = AcquireUnassignedVouchersMutation.Field()
     acquire_assigned_vouchers = AcquireAssignedVouchersMutation.Field()
     assign_vouchers = AssignVouchersMutation.Field()
+
+    create_or_update_group_of_workers = CreateOrUpdateGroupOfWorkerMutation.Field()
+    delete_group_of_workers = DeleteGroupOfWorkerMutation.Field()

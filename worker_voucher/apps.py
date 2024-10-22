@@ -11,6 +11,10 @@ DEFAULT_CONFIG = {
     "gql_worker_voucher_acquire_unassigned_perms": ["204006"],
     "gql_worker_voucher_acquire_assigned_perms": ["204007"],
     "gql_worker_voucher_assign_vouchers_perms": ["204008"],
+    "gql_group_of_worker_search_perms": ["205001"],
+    "gql_group_of_worker_create_perms": ["205002"],
+    "gql_group_of_worker_update_perms": ["205003"],
+    "gql_group_of_worker_delete_perms": ["205004"],
     "unassigned_voucher_enabled": True,
     "price_per_voucher": "100.00",
     "max_generic_vouchers": 1000,
@@ -42,6 +46,10 @@ class WorkerVoucherConfig(AppConfig, ConfigUtilMixin):
     gql_worker_voucher_acquire_unassigned_perms = None
     gql_worker_voucher_acquire_assigned_perms = None
     gql_worker_voucher_assign_vouchers_perms = None
+    gql_group_of_worker_search_perms = None
+    gql_group_of_worker_create_perms = None
+    gql_group_of_worker_update_perms = None
+    gql_group_of_worker_delete_perms = None
 
     unassigned_voucher_enabled = None
     price_per_voucher = None
