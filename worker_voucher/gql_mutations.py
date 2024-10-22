@@ -15,7 +15,7 @@ from msystems.services.mconnect_worker_service import MConnectWorkerService
 from policyholder.models import PolicyHolder, PolicyHolderInsuree
 from policyholder.services import PolicyHolderInsuree as PolicyHolderInsureeService
 from worker_voucher.apps import WorkerVoucherConfig
-from worker_voucher.models import WorkerVoucher
+from worker_voucher.models import WorkerVoucher, WorkerGroup
 from worker_voucher.services import WorkerVoucherService, GroupOfWorkerService, validate_acquire_unassigned_vouchers, \
     validate_acquire_assigned_vouchers, validate_assign_vouchers, create_assigned_voucher, create_voucher_bill, \
     create_unassigned_voucher, assign_voucher, economic_unit_user_filter, check_existing_active_vouchers
@@ -144,9 +144,20 @@ class DeleteWorkerMutation(BaseMutation):
 
         today = datetime.datetime.now()
         check_existing_active_vouchers(eu_uuid, [phi.insuree.id], today)
+        cls._delete_worker_from_group(worker_uuid, eu_uuid)
 
         phi.delete(user=user)
         return []
+
+    @classmethod
+    def _delete_worker_from_group(cls, worker_uuid, eu_uuid):
+        workers_in_group = WorkerGroup.objects.filter(
+            group__policyholder__id=eu_uuid,
+            insuree__uuid=worker_uuid,
+            insuree__validity_to__isnull=True,
+            is_deleted=False
+        )
+        workers_in_group.delete()
 
 
 class CreateWorkerVoucherInput(OpenIMISMutation.Input):
