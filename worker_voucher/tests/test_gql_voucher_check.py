@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.test import TestCase
 from graphene import Schema
 from graphene.test import Client
@@ -38,9 +38,9 @@ class GQLVoucherCheckTestCase(TestCase):
             mutation=Mutation
         )
 
-        cls.today = datetime.datetime.now()
-        cls.tomorrow = datetime.datetime.now() + datetime.datetimedelta(days=1)
-        cls.yesterday = datetime.datetime.now() - datetime.datetimedelta(days=1)
+        cls.today = datetime.now()
+        cls.tomorrow = datetime.now() + timedelta(days=1)
+        cls.yesterday = datetime.now() - timedelta(days=1)
 
         cls.gql_client = Client(gql_schema)
         cls.gql_context = cls.GQLContext(None)
