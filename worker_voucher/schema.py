@@ -135,7 +135,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         eu = PolicyHolder.objects.filter(economic_unit_user_filter(info.context.user), code=economic_unit_code).first()
         if not eu:
-            return [{"message": _("workers.validation.economic_unit_not_exist")}]
+            raise AttributeError(_("workers.validation.economic_unit_not_exist"))
 
         query = Insuree.get_queryset(None, info.context.user).distinct('id').filter(
             worker_user_filter(info.context.user, economic_unit_code=economic_unit_code),
@@ -208,35 +208,26 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
         return AcquireVouchersValidationSummaryGQLType(**validation_summary)
 
     def resolve_online_worker_data(self, info, national_id=None, economic_unit_code=None, **kwargs):
-        try:
-            logger.info("Online worker data: step 1" )
-            Query._check_permissions(info.context.user, InsureeConfig.gql_query_insuree_perms)
+        Query._check_permissions(info.context.user, InsureeConfig.gql_query_insuree_perms)
 
-            logger.info("Online worker data: step 2")
-            eu = PolicyHolder.objects.filter(economic_unit_user_filter(info.context.user), code=economic_unit_code).first()
-            if not eu:
-                return [{"message": _("workers.validation.economic_unit_not_exist")}]
+        eu = PolicyHolder.objects.filter(economic_unit_user_filter(info.context.user), code=economic_unit_code).first()
+        if not eu:
+            raise AttributeError(_("workers.validation.economic_unit_not_exist"))
 
-            logger.info("Online worker data: step 3")
-            if InsureeConfig.get_insuree_number_validator():
-                errors = custom_insuree_number_validation(national_id)
-                if errors:
-                    return errors
+        if InsureeConfig.get_insuree_number_validator():
+            errors = custom_insuree_number_validation(national_id)
+            if errors:
+                raise AttributeError(_("Insuree number not valid"))
 
-            logger.info("Online worker data: step 4")
-            online_result = MConnectWorkerService().fetch_worker_data(national_id, info.context.user, eu)
-            if not online_result.get("success", False):
-                logger.error("Online worker data failed% %s", online_result)
-                raise AttributeError(online_result.get("error", _("Unknown Error")))
+        online_result = MConnectWorkerService().fetch_worker_data(national_id, info.context.user, eu)
+        if not online_result.get("success", False):
+            raise AttributeError(online_result.get("error", _("Unknown Error")))
 
-            logger.info("Online worker data: %s", online_result)
-            return OnlineWorkerDataGQLType(
+        return OnlineWorkerDataGQLType(
             other_names=online_result["data"]["GivenName"],
             last_name=online_result["data"]["FamilyName"],
             photo=online_result["data"]["Photo"]
-            )
-        except Exception as e:
-            logger.error("Error", exc_info=e)
+        )
 
     def resolve_group_of_worker(self, info, economic_unit_code=None, **kwargs):
         if not info.context.user.has_perms(WorkerVoucherConfig.gql_group_of_worker_search_perms):
