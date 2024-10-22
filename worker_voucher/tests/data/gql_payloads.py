@@ -74,6 +74,18 @@ mutation deleteWorker {
 }
 """
 
+gql_mutation_worker_delete_multiple = """
+mutation deleteWorker {
+  deleteWorker(input: {
+    uuids: ["%s", "%s", "%s"]
+    economicUnitCode: "%s"
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""
+
 gql_mutation_create_group_of_worker = """
 mutation addGroupOfWorker {
   createOrUpdateGroupOfWorkers(input: {
