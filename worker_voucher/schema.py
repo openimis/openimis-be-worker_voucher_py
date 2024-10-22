@@ -258,7 +258,6 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
                     employer_code=None,
                     employer_name=None,
                 )
-            # assigned_date__date=today,
             if voucher.assigned_date.date() >= today.date():
                 return VoucherCheckGQLType(
                     is_existed=True,
