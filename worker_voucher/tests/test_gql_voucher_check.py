@@ -54,7 +54,7 @@ class GQLVoucherCheckTestCase(TestCase):
         query_data = query_result['data']['voucherCheck']
         self.assertEqual(query_data['isExisted'], True)
         self.assertEqual(query_data['isValid'], True)
-        assigned_date = datetime.strptime(query_data['assignedDate'], '%Y-%m-%d').date()
+        assigned_date = datetime.strptime(query_data['assignedDate'], '%Y-%m-%dT%H:%M:%S.%f').date()
         self.assertEqual(assigned_date, voucher.assigned_date.date())
         self.assertEqual(query_data['employerCode'], voucher.policyholder.code)
         self.assertEqual(query_data['employerName'], voucher.policyholder.trade_name)
@@ -68,7 +68,7 @@ class GQLVoucherCheckTestCase(TestCase):
         query_data = query_result['data']['voucherCheck']
         self.assertEqual(query_data['isExisted'], True)
         self.assertEqual(query_data['isValid'], True)
-        assigned_date = datetime.strptime(query_data['assignedDate'], '%Y-%m-%d').date()
+        assigned_date = datetime.strptime(query_data['assignedDate'], '%Y-%m-%dT%H:%M:%S.%f').date()
         self.assertEqual(assigned_date, voucher.assigned_date.date())
         self.assertEqual(query_data['employerCode'], voucher.policyholder.code)
         self.assertEqual(query_data['employerName'], voucher.policyholder.trade_name)
@@ -94,7 +94,7 @@ class GQLVoucherCheckTestCase(TestCase):
         query_data = query_result['data']['voucherCheck']
         self.assertEqual(query_data['isExisted'], True)
         self.assertEqual(query_data['isValid'], False)
-        assigned_date = datetime.strptime(query_data['assignedDate'], '%Y-%m-%d').date()
+        assigned_date = datetime.strptime(query_data['assignedDate'], '%Y-%m-%dT%H:%M:%S.%f').date()
         self.assertEqual(assigned_date, voucher.assigned_date.date())
         self.assertEqual(query_data['employerCode'], voucher.policyholder.code)
         self.assertEqual(query_data['employerName'], voucher.policyholder.trade_name)
