@@ -12,6 +12,10 @@ from worker_voucher.tests.data.gql_payloads import gql_query_voucher_check
 
 
 class GQLVoucherCheckTestCase(TestCase):
+    class GQLContext:
+        def __init__(self, user):
+            self.user = user
+
     user = None
     worker = None
     eu = None
