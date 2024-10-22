@@ -1,6 +1,6 @@
 from django.db import migrations
 
-rights = ['205001', '205002', '205003', '205004']
+rights = ['206001', '206002', '206003', '206004']
 roles = ['Employer', 'IMIS Administrator']
 
 

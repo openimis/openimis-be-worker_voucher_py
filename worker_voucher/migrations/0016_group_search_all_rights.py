@@ -1,6 +1,6 @@
 from django.db import migrations
 
-rights = ['205005']
+rights = ['206005']
 roles = ['IMIS Administrator']
 
 
