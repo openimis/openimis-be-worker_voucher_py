@@ -275,7 +275,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
                     employer_code=voucher.policyholder.code,
                     employer_name=voucher.policyholder.trade_name
                 )
-        except Exception as e:
+        except Exception:
             raise ValidationError(_("Unable to fetch voucher details"))
 
     @staticmethod
