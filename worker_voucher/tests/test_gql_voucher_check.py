@@ -46,35 +46,29 @@ class GQLVoucherCheckTestCase(TestCase):
 
     def test_get_existed_voucher_by_code(self):
         voucher = self._create_test_voucher()
-        print(voucher)
         payload = gql_query_voucher_check % (
             voucher.code
         )
-        print(payload)
         query_result = self.gql_client.execute(payload, context=self.gql_context)
-        print(query_result)
         query_data = query_result['data']['voucherCheck']
-        print(query_data)
         self.assertEqual(query_data['isExisted'], True)
         self.assertEqual(query_data['isValid'], True)
-        self.assertEqual(query_data['assignedDate'].date(), voucher.assigned_date.date())
+        assigned_date = datetime.strptime(query_data['assignedDate'], '%Y-%m-%d').date()
+        self.assertEqual(assigned_date, voucher.assigned_date.date())
         self.assertEqual(query_data['employerCode'], voucher.policyholder.code)
         self.assertEqual(query_data['employerName'], voucher.policyholder.trade_name)
 
     def test_get_existed_voucher_from_tomorrow_by_code(self):
         voucher = self._create_test_voucher(assigned_date=self.tomorrow)
-        print(voucher)
         payload = gql_query_voucher_check % (
             voucher.code
         )
-        print(payload)
         query_result = self.gql_client.execute(payload, context=self.gql_context)
-        print(query_result)
         query_data = query_result['data']['voucherCheck']
-        print(query_data)
         self.assertEqual(query_data['isExisted'], True)
         self.assertEqual(query_data['isValid'], True)
-        self.assertEqual(query_data['assignedDate'].date(), voucher.assigned_date.date())
+        assigned_date = datetime.strptime(query_data['assignedDate'], '%Y-%m-%d').date()
+        self.assertEqual(assigned_date, voucher.assigned_date.date())
         self.assertEqual(query_data['employerCode'], voucher.policyholder.code)
         self.assertEqual(query_data['employerName'], voucher.policyholder.trade_name)
 
@@ -82,11 +76,8 @@ class GQLVoucherCheckTestCase(TestCase):
         payload = gql_query_voucher_check % (
             "Not-Existed"
         )
-        print(payload)
         query_result = self.gql_client.execute(payload, context=self.gql_context)
-        print(query_result)
         query_data = query_result['data']['voucherCheck']
-        print(query_data)
         self.assertEqual(query_data['isExisted'], False)
         self.assertEqual(query_data['isValid'], False)
         self.assertEqual(query_data['assignedDate'], None)
@@ -95,18 +86,15 @@ class GQLVoucherCheckTestCase(TestCase):
 
     def test_get_existed_voucher_from_yesterday_by_code(self):
         voucher = self._create_test_voucher(assigned_date=self.yesterday)
-        print(voucher)
         payload = gql_query_voucher_check % (
             voucher.code
         )
-        print(payload)
         query_result = self.gql_client.execute(payload, context=self.gql_context)
-        print(query_result)
         query_data = query_result['data']['voucherCheck']
-        print(query_data)
         self.assertEqual(query_data['isExisted'], True)
         self.assertEqual(query_data['isValid'], False)
-        self.assertEqual(query_data['assignedDate'].date(), voucher.assigned_date.date())
+        assigned_date = datetime.strptime(query_data['assignedDate'], '%Y-%m-%d').date()
+        self.assertEqual(assigned_date, voucher.assigned_date.date())
         self.assertEqual(query_data['employerCode'], voucher.policyholder.code)
         self.assertEqual(query_data['employerName'], voucher.policyholder.trade_name)
 
