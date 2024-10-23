@@ -527,6 +527,7 @@ class WorkerUploadService:
         data_from_mconnect = {}
         if WorkerVoucherConfig.validate_created_worker_online:
             online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, policyholder)
+            print(online_result)
             if not online_result.get("success", False):
                 return online_result
             else:
