@@ -518,7 +518,6 @@ class WorkerUploadService:
             })
         data_from_mconnect = self._fetch_data_from_mconnect(chf_id, ph)
         is_mconnect_success = data_from_mconnect.get("success", False)
-        print(is_mconnect_success)
         if not is_mconnect_success:
             errors.append(data_from_mconnect)
         else:
@@ -528,8 +527,7 @@ class WorkerUploadService:
     def _fetch_data_from_mconnect(self, chf_id, policyholder):
         data_from_mconnect = {}
         if WorkerVoucherConfig.validate_created_worker_online:
-            online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, policyholder)
-            print(online_result)
+            online_result = MConnectWorkerService().fetch_worker_data(f"{chf_id}", self.user, policyholder)
             if not online_result.get("success", False):
                 return online_result
             else:
