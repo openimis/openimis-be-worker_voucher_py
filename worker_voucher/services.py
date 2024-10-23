@@ -517,7 +517,9 @@ class WorkerUploadService:
                 "message": _("worker_upload.validation.no_authority_to_use_selected_economic_unit")
             })
         data_from_mconnect = self._fetch_data_from_mconnect(chf_id, ph)
-        if data_from_mconnect.get("success", False):
+        is_mconnect_success = data_from_mconnect.get("success", False)
+        print(is_mconnect_success)
+        if not is_mconnect_success:
             errors.append(data_from_mconnect)
         else:
             self._add_worker_to_system(chf_id, economic_unit, data_from_mconnect, errors)
