@@ -31,8 +31,6 @@ class WorkerUploadAPIView(views.APIView):
             file_handler = DefaultStorageFileHandler(target_file_path)
             service = WorkerUploadService(request.user)
             file_to_upload, errors, summary = service.upload_worker(economic_unit_code, file, upload)
-            print(errors, 'xxxx')
-            print(summary)
             if errors:
                 upload.status = WorkerUpload.Status.PARTIAL_SUCCESS
                 upload.error = errors

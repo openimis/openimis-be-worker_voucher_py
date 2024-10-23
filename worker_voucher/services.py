@@ -518,9 +518,12 @@ class WorkerUploadService:
             })
         data_from_mconnect = self._fetch_data_from_mconnect(chf_id, ph)
         is_mconnect_success = data_from_mconnect.get("success", False)
+        print(is_mconnect_success, 'is mconnect succcess')
         if not is_mconnect_success:
+            print('added error')
             errors.append(data_from_mconnect)
         else:
+            print(data_from_mconnect)
             self._add_worker_to_system(chf_id, economic_unit, data_from_mconnect, errors)
         return errors if errors else None
 
