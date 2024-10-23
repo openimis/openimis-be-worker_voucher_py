@@ -517,19 +517,22 @@ class WorkerUploadService:
                 "message": _("worker_upload.validation.no_authority_to_use_selected_economic_unit")
             })
         data_from_mconnect = self._fetch_data_from_mconnect(chf_id, ph)
-        if data_from_mconnect.get("success", False):
+        is_mconnect_success = data_from_mconnect.get("success", False)
+        if not is_mconnect_success:
             errors.append(data_from_mconnect)
         else:
+            data_from_mconnect.pop('success')
             self._add_worker_to_system(chf_id, economic_unit, data_from_mconnect, errors)
         return errors if errors else None
 
     def _fetch_data_from_mconnect(self, chf_id, policyholder):
         data_from_mconnect = {}
         if WorkerVoucherConfig.validate_created_worker_online:
-            online_result = MConnectWorkerService().fetch_worker_data(chf_id, self.user, policyholder)
+            online_result = MConnectWorkerService().fetch_worker_data(f"{chf_id}", self.user, policyholder)
             if not online_result.get("success", False):
                 return online_result
             else:
+                data_from_mconnect['success'] = online_result['success']
                 data_from_mconnect['chf_id'] = chf_id
                 data_from_mconnect['other_names'] = online_result["data"]["GivenName"]
                 data_from_mconnect['last_name'] = online_result["data"]["FamilyName"]
