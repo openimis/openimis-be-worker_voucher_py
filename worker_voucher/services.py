@@ -523,6 +523,7 @@ class WorkerUploadService:
             print('added error')
             errors.append(data_from_mconnect)
         else:
+            data_from_mconnect.pop('success')
             print(data_from_mconnect)
             self._add_worker_to_system(chf_id, economic_unit, data_from_mconnect, errors)
         return errors if errors else None
@@ -534,6 +535,7 @@ class WorkerUploadService:
             if not online_result.get("success", False):
                 return online_result
             else:
+                data_from_mconnect['success'] = online_result['success']
                 data_from_mconnect['chf_id'] = chf_id
                 data_from_mconnect['other_names'] = online_result["data"]["GivenName"]
                 data_from_mconnect['last_name'] = online_result["data"]["FamilyName"]
