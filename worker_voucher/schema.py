@@ -1,3 +1,5 @@
+import logging
+
 import graphene
 import graphene_django_optimizer as gql_optimizer
 
@@ -32,6 +34,8 @@ from worker_voucher.services import (
     worker_user_filter,
     get_group_worker_user_filters
 )
+
+logger = logging.getLogger(__name__)
 
 
 class Query(ExportableQueryMixin, graphene.ObjectType):
@@ -131,7 +135,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         eu = PolicyHolder.objects.filter(economic_unit_user_filter(info.context.user), code=economic_unit_code).first()
         if not eu:
-            return [{"message": _("workers.validation.economic_unit_not_exist")}]
+            raise AttributeError(_("workers.validation.economic_unit_not_exist"))
 
         query = Insuree.get_queryset(None, info.context.user).distinct('id').filter(
             worker_user_filter(info.context.user, economic_unit_code=economic_unit_code),
@@ -208,12 +212,12 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
 
         eu = PolicyHolder.objects.filter(economic_unit_user_filter(info.context.user), code=economic_unit_code).first()
         if not eu:
-            return [{"message": _("workers.validation.economic_unit_not_exist")}]
+            raise AttributeError(_("workers.validation.economic_unit_not_exist"))
 
         if InsureeConfig.get_insuree_number_validator():
             errors = custom_insuree_number_validation(national_id)
             if errors:
-                return errors
+                raise AttributeError(_("Insuree number not valid"))
 
         online_result = MConnectWorkerService().fetch_worker_data(national_id, info.context.user, eu)
         if not online_result.get("success", False):
