@@ -57,7 +57,7 @@ class GQLVoucherDraftFormDeleteTestCase(TestCase):
         # create draft
         mutation_id = uuid4()
         payload = gql_mutation_voucher_draft_form_create % (
-            self.existing_worker.id,
+            self.worker.id,
             self.today,
             self.today,
             "ASSIGNMENT",
@@ -125,7 +125,7 @@ class GQLVoucherDraftFormDeleteTestCase(TestCase):
         # create draft
         mutation_id = uuid4()
         payload = gql_mutation_voucher_draft_form_create % (
-            self.existing_worker.id,
+            self.worker.id,
             self.today,
             self.today,
             "ASSIGNMENT",
