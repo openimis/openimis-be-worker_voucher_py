@@ -18,7 +18,7 @@ from worker_voucher.apps import WorkerVoucherConfig
 from worker_voucher.models import WorkerVoucher, WorkerGroup
 from worker_voucher.services import WorkerVoucherService, GroupOfWorkerService, validate_acquire_unassigned_vouchers, \
     validate_acquire_assigned_vouchers, validate_assign_vouchers, create_assigned_voucher, create_voucher_bill, \
-    create_unassigned_voucher, assign_voucher, economic_unit_user_filter, check_existing_active_vouchers
+    create_unassigned_voucher, assign_voucher, economic_unit_user_filter, check_existing_active_vouchers, VoucherFormDraftService
 
 
 class CreateWorkerMutation(CreateInsureeMutation):
@@ -308,6 +308,13 @@ class AcquireAssignedVouchersMutationInput(OpenIMISMutation.Input):
     workers = graphene.List(graphene.ID, required=True)
 
 
+class VoucherFormDraftMutationInput(OpenIMISMutation.Input):
+    economic_unit_code = graphene.ID(required=True)
+    type_of_form = graphene.String(required=True)
+    date_ranges = graphene.List(DateRangeInclusiveInputType, required=True)
+    workers = graphene.List(graphene.Int, required=True)
+
+
 class AcquireAssignedVouchersMutation(BaseMutation):
     _mutation_class = "AcquireAssignedVouchersMutation"
     _mutation_module = "worker_voucher"
@@ -478,6 +485,83 @@ class DeleteGroupOfWorkerMutation(BaseMutation):
                     errors += service.delete(group_id, eu_uuid)
                     if errors:
                         raise ValueError("Errors during mutation")
+        except ValueError:
+            pass
+
+        return errors
+
+
+class CreateOrUpdateVoucherFormDraftMutation(BaseMutation):
+    _mutation_module = "worker_voucher"
+    _mutation_class = "CreateOrUpdateVoucherFormDraftMutation"
+
+    class Input(VoucherFormDraftMutationInput):
+        pass
+
+    @classmethod
+    def _validate_mutation(cls, user, **data):
+        if type(user) is AnonymousUser or not user.id or not user.has_perms(
+                WorkerVoucherConfig.gql_worker_voucher_assign_vouchers_perms):
+            raise ValidationError("mutation.authentication_required")
+
+    @classmethod
+    def _mutate(cls, user, **data):
+        try:
+            if data.get("type_of_form", None) not in ["ASSIGNMENT", "ACQUIREMENT"]:
+                return [{"message": _("workers.validation.type_of_form_not_exist")}]
+            data.pop('client_mutation_id', None)
+            data.pop('client_mutation_label', None)
+            eu_code = data.get('economic_unit_code', None)
+            eu_uuid = (PolicyHolder.objects
+                       .filter(economic_unit_user_filter(user), code=eu_code)
+                       .values_list('uuid', flat=True)
+                       .first())
+            if not eu_uuid:
+                return [{"message": _("worker_voucher.validation.economic_unit_not_exists")}]
+            with transaction.atomic():
+                service = VoucherFormDraftService(user)
+                service.create_or_update(data)
+            return None
+        except Exception as exc:
+            return [
+                {
+                    'message': "worker_voucher.mutation.failed_to_create_or_update_voucher_form_draft",
+                    'detail': str(exc)
+                }]
+
+
+class DeleteVoucherDraftFormMutation(BaseMutation):
+    _mutation_module = "worker_voucher"
+    _mutation_class = "DeleteVoucherDraftFormMutation"
+
+    class Input(OpenIMISMutation.Input):
+        type_of_form = graphene.String(required=True)
+        economic_unit_code = graphene.String(required=True)
+
+    @classmethod
+    def _validate_mutation(cls, user, **data):
+        if type(user) is AnonymousUser or not user.id or not user.has_perms(
+                WorkerVoucherConfig.gql_worker_voucher_assign_vouchers_perms):
+            raise ValidationError("mutation.authentication_required")
+
+    @classmethod
+    def _mutate(cls, user, type_of_form=None, economic_unit_code=None, **data):
+        if type_of_form not in ["ASSIGNMENT", "ACQUIREMENT"]:
+            return [{"message": _("workers.validation.type_of_form_not_exist")}]
+
+        eu_uuid = (PolicyHolder.objects
+                   .filter(economic_unit_user_filter(user), code=economic_unit_code)
+                   .values_list('uuid', flat=True)
+                   .first())
+
+        if not eu_uuid:
+            return [{"message": _("worker_voucher.validation.economic_unit_not_exists")}]
+
+        errors = []
+        service = VoucherFormDraftService(user)
+        try:
+            with transaction.atomic():
+                service.delete(economic_unit_code, type_of_form)
         except ValueError:
             pass
 
