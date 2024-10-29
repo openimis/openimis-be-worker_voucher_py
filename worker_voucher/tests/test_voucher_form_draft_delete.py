@@ -4,6 +4,7 @@ from django.test import TestCase
 from core.models import MutationLog, Role
 from graphene import Schema
 from graphene.test import Client
+from core import datetime
 from core.test_helpers import create_test_interactive_user
 from insuree.models import Insuree
 from insuree.test_helpers import generate_random_insuree_number
@@ -31,15 +32,17 @@ class GQLVoucherDraftFormDeleteTestCase(TestCase):
             self.user = user
 
     user = None
-    user2 = None
     eu = None
     worker = None
+    today = None,
+    yesterday = None,
+    tomorrow = None
 
     @classmethod
     def setUpClass(cls):
         super(GQLVoucherDraftFormDeleteTestCase, cls).setUpClass()
         role_employer = Role.objects.get(name='Employer', validity_to__isnull=True)
-        cls.user = create_test_interactive_user(username='VoucherTestUser1', roles=[role_employer.id])
+        cls.user = create_test_interactive_user(username='DraftUser3', roles=[role_employer.id])
         cls.eu = create_test_eu_for_user(cls.user)
         cls.worker = create_test_worker_for_eu(cls.user, cls.eu, chf_id=F"{generate_random_insuree_number()}")
 
@@ -50,7 +53,10 @@ class GQLVoucherDraftFormDeleteTestCase(TestCase):
 
         cls.gql_client = Client(gql_schema)
         cls.gql_context = cls.GQLContext(cls.user)
-        cls.gql_context2 = cls.GQLContext(cls.user2)
+
+        cls.today = datetime.date.today()
+        cls.tomorrow = datetime.date.today() + datetime.datetimedelta(days=1)
+        cls.yesterday = datetime.date.today() - datetime.datetimedelta(days=1)
 
     def test_delete_voucher_form_draft_success(self):
         InsureeConfig.reset_validation_settings()

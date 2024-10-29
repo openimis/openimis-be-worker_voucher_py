@@ -43,8 +43,8 @@ class GQLVoucherDraftFormUpdateTestCase(TestCase):
     def setUpClass(cls):
         super(GQLVoucherDraftFormUpdateTestCase, cls).setUpClass()
         role_employer = Role.objects.get(name='Employer', validity_to__isnull=True)
-        cls.user = create_test_interactive_user(username='VoucherTestUser2', roles=[role_employer.id])
-        cls.eu = create_test_eu_for_user(cls.user, code='test_eu2')
+        cls.user = create_test_interactive_user(username='DraftUser2', roles=[role_employer.id])
+        cls.eu = create_test_eu_for_user(cls.user, code='draft2')
         cls.chf_id = F"{generate_random_insuree_number()}"
         cls.existing_worker = create_test_worker_for_eu(cls.user, cls.eu, chf_id=F"{generate_random_insuree_number()}")
         cls.existing_worker2 = create_test_worker_for_eu(cls.user, cls.eu, chf_id=F"{generate_random_insuree_number()}")
@@ -82,6 +82,7 @@ class GQLVoucherDraftFormUpdateTestCase(TestCase):
             mutation_id
         )
         _ = self.gql_client.execute(payload, context=self.gql_context)
+        print(_)
         draft = VoucherFormDraft.objects.filter(
             policyholder__code=self.eu.code,
             user=self.user,
