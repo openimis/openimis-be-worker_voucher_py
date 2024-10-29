@@ -163,3 +163,84 @@ query voucherCheck{
   }
 }
 """
+
+gql_mutation_voucher_draft_form_delete = """
+mutation deleteVoucherDraftForm {
+  deleteVoucherDraftForm(input: {
+    economicUnitCode: "%s"
+    typeOfForm: "%s"
+    economicUnitCode: "%s"
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""
+
+gql_mutation_voucher_draft_form_create = """
+mutation createOrUpdateVoucherDraftForm {
+  createOrUpdateVoucherDraftForm(input: {
+    workers: ["%s"]
+    dateRanges: [
+      {
+        startDate: "%s", 
+        endDate: "%s"
+      }
+    ]
+    typeOfForm: "%s"
+    economicUnitCode: "%s"
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""
+
+gql_mutation_voucher_draft_form_update = """
+mutation createOrUpdateVoucherDraftForm {
+  createOrUpdateVoucherDraftForm(input: {
+    workers: ["%s", "%s", "%s"]
+    dateRanges: [
+      {
+        startDate: "%s", 
+        endDate: "%s"
+      },
+      {
+        startDate: "%s", 
+        endDate: "%s"
+      }
+    ]
+    typeOfForm: "%s"
+    economicUnitCode: "%s"
+    clientMutationId: "%s"
+  }) {
+    clientMutationId
+  }
+}
+"""
+
+gql_query_voucher_draft_form = """
+query voucherFormDraft{
+  voucherFormDraft {
+    edges{
+      node{
+        id
+        type
+        user {
+          username          
+        }
+        policyholder {
+          code
+        }
+        workers{
+          chfId
+        }
+        dateRanges {
+          startDate
+          endDate
+        }
+      }
+    }
+  }
+}
+"""
