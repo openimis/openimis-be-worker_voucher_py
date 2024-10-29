@@ -179,7 +179,7 @@ mutation deleteVoucherDraftForm {
 gql_mutation_voucher_draft_form_create = """
 mutation createOrUpdateVoucherDraftForm {
   createOrUpdateVoucherDraftForm(input: {
-    workers: ["%s"]
+    workers: [%s]
     dateRanges: [
       {
         startDate: "%s", 
@@ -198,7 +198,7 @@ mutation createOrUpdateVoucherDraftForm {
 gql_mutation_voucher_draft_form_update = """
 mutation createOrUpdateVoucherDraftForm {
   createOrUpdateVoucherDraftForm(input: {
-    workers: ["%s", "%s", "%s"]
+    workers: [%s, %s, %s]
     dateRanges: [
       {
         startDate: "%s", 
