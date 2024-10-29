@@ -169,7 +169,6 @@ mutation deleteVoucherDraftForm {
   deleteVoucherDraftForm(input: {
     economicUnitCode: "%s"
     typeOfForm: "%s"
-    economicUnitCode: "%s"
     clientMutationId: "%s"
   }) {
     clientMutationId

@@ -1,3 +1,4 @@
+from uuid import uuid4
 from django.test import TestCase
 from core.models import MutationLog, Role
 from graphene import Schema
@@ -71,7 +72,7 @@ class GQLVoucherDraftFormUpdateTestCase(TestCase):
         self.assertEquals(before_test.count(), 0)
 
         # create draft
-        mutation_id = "93g453h5g77h04f001"
+        mutation_id = uuid4()
         payload = gql_mutation_voucher_draft_form_create % (
             self.existing_worker.id,
             self.today,
@@ -97,7 +98,7 @@ class GQLVoucherDraftFormUpdateTestCase(TestCase):
         self.assertEquals(draft_workers.count(), 1)
 
         # update draft
-        mutation_id = "93g453h5g77p04f0002"
+        mutation_id = uuid4()
         payload = gql_mutation_voucher_draft_form_update % (
             self.existing_worker.id,
             self.existing_worker2.id,

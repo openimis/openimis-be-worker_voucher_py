@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from django.test import TestCase
 from core.models import MutationLog, Role
 from graphene import Schema
@@ -58,7 +60,7 @@ class GQLVoucherDraftFormCreateTestCase(TestCase):
 
     def test_create_draft_form_success(self):
         InsureeConfig.reset_validation_settings()
-        mutation_id = "93g453h5g33h04gh35"
+        mutation_id = uuid4()
         payload = gql_mutation_voucher_draft_form_create % (
             self.existing_worker.id,
             self.today,
@@ -85,7 +87,7 @@ class GQLVoucherDraftFormCreateTestCase(TestCase):
 
     def test_create_voucher_draft_form_false_not_existing_form_type(self):
         InsureeConfig.reset_validation_settings()
-        mutation_id = "39g422j5g92h04gh36"
+        mutation_id = uuid4()
         payload = gql_mutation_voucher_draft_form_create % (
             self.existing_worker.id,
             self.today,
@@ -106,7 +108,7 @@ class GQLVoucherDraftFormCreateTestCase(TestCase):
 
     def test_create_voucher_draft_form_false_not_existing_eu(self):
         InsureeConfig.reset_validation_settings()
-        mutation_id = "39g499h5j92h04gh36"
+        mutation_id = uuid4()
         payload = gql_mutation_voucher_draft_form_create % (
             self.existing_worker.id,
             self.today,
