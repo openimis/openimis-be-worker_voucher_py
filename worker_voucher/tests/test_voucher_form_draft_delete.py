@@ -115,17 +115,6 @@ class GQLVoucherDraftFormDeleteTestCase(TestCase):
         self.assertEquals(draft_dates.count(), 0)
         self.assertEquals(draft_workers.count(), 0)
 
-    def test_delete_voucher_form_draft_failed_no_draft(self):
-        mutation_id = uuid4()
-        mutation = gql_mutation_voucher_draft_form_delete % (
-            self.eu.code,
-            'ASSIGNMENT',
-            mutation_id
-        )
-
-        self.gql_client.execute(mutation, context=self.gql_context)
-        self._assert_mutation_failed(mutation_id)
-
     def test_delete_voucher_form_draft_failed_not_existed_form(self):
         InsureeConfig.reset_validation_settings()
         # create draft

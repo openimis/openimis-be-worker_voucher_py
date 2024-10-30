@@ -149,7 +149,12 @@ class DateRangeType(graphene.ObjectType):
 
 
 class WorkersType(graphene.ObjectType):
+    id = graphene.String()
+    uuid = graphene.String()
     chf_id = graphene.String()
+    last_name = graphene.String()
+    other_names = graphene.String()
+    dob = graphene.Date()
 
 
 class VoucherFormDraftGQLType(DjangoObjectType):
@@ -173,10 +178,26 @@ class VoucherFormDraftGQLType(DjangoObjectType):
         connection_class = ExtendedConnection
 
     def resolve_workers(self, info):
-        chf_ids = VoucherFormDraftWorkersDetails.objects.filter(
+        workers = VoucherFormDraftWorkersDetails.objects.filter(
             voucher_form_draft=self
-        ).values('insuree__chf_id')
-        return [WorkersType(chf_id=chf_id['insuree__chf_id']) for chf_id in chf_ids]
+        ).values(
+            'insuree__chf_id',
+            'insuree__id',
+            'insuree__uuid',
+            'insuree__dob',
+            'insuree__last_name',
+            'insuree__other_names',
+        )
+        return [
+            WorkersType(
+                id=worker['insuree__id'],
+                uuid=worker['insuree__uuid'],
+                chf_id=worker['insuree__chf_id'],
+                last_name=worker['insuree__last_name'],
+                other_names=worker['insuree__other_names'],
+                dob=worker['insuree__dob'],
+            )
+            for worker in workers]
 
     # Resolver for date_ranges
     def resolve_date_ranges(self, info):

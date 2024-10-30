@@ -82,7 +82,7 @@ class GQLVoucherDraftFormUpdateTestCase(TestCase):
             mutation_id
         )
         _ = self.gql_client.execute(payload, context=self.gql_context)
-        print(_)
+        self._assert_mutation_success(mutation_id)
         draft = VoucherFormDraft.objects.filter(
             policyholder__code=self.eu.code,
             user=self.user,
@@ -112,6 +112,7 @@ class GQLVoucherDraftFormUpdateTestCase(TestCase):
             mutation_id
         )
         _ = self.gql_client.execute(payload, context=self.gql_context)
+        self._assert_mutation_success(mutation_id)
         draft = VoucherFormDraft.objects.filter(
             policyholder__code=self.eu.code,
             user=self.user,
