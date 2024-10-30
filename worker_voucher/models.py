@@ -1,7 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from core.models import HistoryModel, HistoryBusinessModel
+from core.models import HistoryModel, HistoryBusinessModel, User
 from core import fields
 from insuree.models import Insuree
 from policyholder.models import PolicyHolder
@@ -74,3 +74,24 @@ class GroupOfWorker(HistoryModel):
 class WorkerGroup(HistoryBusinessModel):
     group = models.ForeignKey(GroupOfWorker, related_name="group_workers", on_delete=models.DO_NOTHING)
     insuree = models.ForeignKey(Insuree, null=True, blank=True, on_delete=models.DO_NOTHING)
+
+
+class VoucherFormDraft(HistoryBusinessModel):
+    class Type(models.TextChoices):
+        ACQUIREMENT = 'ACQUIREMENT', _('acquirement')
+        ASSIGNMENT = 'ASSIGNMENT', _('assignment')
+    policyholder = models.ForeignKey(PolicyHolder, models.DO_NOTHING, null=False)
+    user = models.ForeignKey(User, on_delete=models.deletion.DO_NOTHING, null=False, related_name='%(class)s_user_voucher')
+    type = models.CharField(max_length=255, blank=True, null=True, choices=Type.choices,
+                              default=Type.ASSIGNMENT)
+
+
+class VoucherFormDraftWorkersDetails(HistoryBusinessModel):
+    voucher_form_draft = models.ForeignKey(VoucherFormDraft, models.DO_NOTHING, null=False)
+    insuree = models.ForeignKey(Insuree, null=True, blank=True, on_delete=models.DO_NOTHING)
+
+
+class VoucherFormDraftDateRangesDetails(HistoryBusinessModel):
+    voucher_form_draft = models.ForeignKey(VoucherFormDraft, models.DO_NOTHING, null=False)
+    start_date = fields.DateField(blank=True, null=True)
+    end_date = fields.DateField(blank=True, null=True)

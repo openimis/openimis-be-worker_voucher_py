@@ -6,7 +6,15 @@ from insuree.gql_queries import InsureeGQLType, PhotoGQLType, GenderGQLType
 from insuree.models import Insuree
 from invoice.models import Bill
 from policyholder.gql import PolicyHolderGQLType
-from worker_voucher.models import WorkerVoucher, GroupOfWorker, WorkerGroup
+from core.gql_queries import UserGQLType
+from worker_voucher.models import (
+    WorkerVoucher,
+    GroupOfWorker,
+    WorkerGroup,
+    VoucherFormDraft,
+    VoucherFormDraftDateRangesDetails,
+    VoucherFormDraftWorkersDetails,
+)
 from worker_voucher.services import get_worker_yearly_voucher_count_counts
 
 
@@ -133,3 +141,104 @@ class VoucherCheckGQLType(graphene.ObjectType):
     assigned_date = graphene.DateTime()
     employer_code = graphene.String()
     employer_name = graphene.String()
+
+
+class DateRangeType(graphene.ObjectType):
+    start_date = graphene.Date()
+    end_date = graphene.Date()
+
+
+class WorkersType(graphene.ObjectType):
+    id = graphene.String()
+    uuid = graphene.String()
+    chf_id = graphene.String()
+    last_name = graphene.String()
+    other_names = graphene.String()
+    dob = graphene.Date()
+
+
+class VoucherFormDraftGQLType(DjangoObjectType):
+    uuid = graphene.String(source='uuid')
+    workers = graphene.List(WorkersType)
+    date_ranges = graphene.List(DateRangeType)
+
+    class Meta:
+        model = VoucherFormDraft
+        interfaces = (graphene.relay.Node,)
+        filter_fields = {
+            "id": ["exact"],
+            **prefix_filterset("user__", UserGQLType._meta.filter_fields),
+            **prefix_filterset("policyholder__", PolicyHolderGQLType._meta.filter_fields),
+            "type": ["exact", "istartswith", "icontains", "iexact"],
+
+            "date_created": ["exact", "lt", "lte", "gt", "gte"],
+            "date_updated": ["exact", "lt", "lte", "gt", "gte"],
+            "is_deleted": ["exact"],
+        }
+        connection_class = ExtendedConnection
+
+    def resolve_workers(self, info):
+        workers = VoucherFormDraftWorkersDetails.objects.filter(
+            voucher_form_draft=self
+        ).values(
+            'insuree__chf_id',
+            'insuree__id',
+            'insuree__uuid',
+            'insuree__dob',
+            'insuree__last_name',
+            'insuree__other_names',
+        )
+        return [
+            WorkersType(
+                id=worker['insuree__id'],
+                uuid=worker['insuree__uuid'],
+                chf_id=worker['insuree__chf_id'],
+                last_name=worker['insuree__last_name'],
+                other_names=worker['insuree__other_names'],
+                dob=worker['insuree__dob'],
+            )
+            for worker in workers]
+
+    # Resolver for date_ranges
+    def resolve_date_ranges(self, info):
+        date_ranges = VoucherFormDraftDateRangesDetails.objects.filter(
+            voucher_form_draft=self
+        ).values('start_date', 'end_date')
+        return [DateRangeType(start_date=dr['start_date'], end_date=dr['end_date']) for dr in date_ranges]
+
+
+class VoucherFormDraftWorkerDetailsGQLType(DjangoObjectType):
+    uuid = graphene.String(source='uuid')
+
+    class Meta:
+        model = VoucherFormDraftWorkersDetails
+        interfaces = (graphene.relay.Node,)
+        filter_fields = {
+            "id": ["exact"],
+            "insuree_id": ["exact"],
+            **prefix_filterset("voucher_form_draft__", VoucherFormDraftGQLType._meta.filter_fields),
+
+            "date_created": ["exact", "lt", "lte", "gt", "gte"],
+            "date_updated": ["exact", "lt", "lte", "gt", "gte"],
+            "is_deleted": ["exact"],
+        }
+        connection_class = ExtendedConnection
+
+
+class VoucherFormDraftDateRangesDetailsGQLType(DjangoObjectType):
+    uuid = graphene.String(source='uuid')
+
+    class Meta:
+        model = VoucherFormDraftDateRangesDetails
+        interfaces = (graphene.relay.Node,)
+        filter_fields = {
+            "id": ["exact"],
+            **prefix_filterset("voucher_form_draft__", VoucherFormDraftGQLType._meta.filter_fields),
+
+            "start_date": ["exact", "lt", "lte", "gt", "gte"],
+            "end_date": ["exact", "lt", "lte", "gt", "gte"],
+            "date_created": ["exact", "lt", "lte", "gt", "gte"],
+            "date_updated": ["exact", "lt", "lte", "gt", "gte"],
+            "is_deleted": ["exact"],
+        }
+        connection_class = ExtendedConnection

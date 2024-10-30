@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+import uuid
 from io import BytesIO
 from decimal import Decimal
 from typing import Iterable, Dict, Union, List
@@ -28,7 +29,14 @@ from policyholder.models import PolicyHolder, PolicyHolderInsuree
 from policyholder.services import PolicyHolderInsuree as PolicyHolderInsureeService
 from msystems.services.mconnect_worker_service import MConnectWorkerService
 from worker_voucher.apps import WorkerVoucherConfig
-from worker_voucher.models import WorkerVoucher, GroupOfWorker, WorkerGroup
+from worker_voucher.models import (
+    WorkerVoucher,
+    GroupOfWorker,
+    WorkerGroup,
+    VoucherFormDraft,
+    VoucherFormDraftDateRangesDetails,
+    VoucherFormDraftWorkersDetails,
+)
 from worker_voucher.validation import WorkerVoucherValidation
 
 logger = logging.getLogger(__name__)
@@ -89,6 +97,17 @@ def get_group_worker_user_filters(user: InteractiveUser) -> Iterable[Q]:
         policyholder__policyholderuser__user__validity_to__isnull=True,
         policyholder__policyholderuser__user__i_user__validity_to__isnull=True,
     )] if not user.has_perms(WorkerVoucherConfig.gql_group_of_worker_search_all_perms) else []
+
+
+def get_draft_voucher_user_filters(user: InteractiveUser) -> Iterable[Q]:
+    return [Q(
+        policyholder__policyholderuser__user__i_user=user.i_user,
+        policyholder__is_deleted=False,
+        policyholder__policyholderuser__is_deleted=False,
+        policyholder__policyholderuser__user__validity_to__isnull=True,
+        policyholder__policyholderuser__user__i_user__validity_to__isnull=True,
+        user__i_user=user.i_user,
+    )] if user.has_perms(WorkerVoucherConfig.gql_worker_voucher_assign_vouchers_perms) else []
 
 
 def validate_acquire_unassigned_vouchers(user: User, eu_code: str, count: Union[int, str]) -> Dict:
@@ -662,3 +681,100 @@ def worker_voucher_bill_user_filter(qs: QuerySet, user: User) -> QuerySet:
 
     return qs.annotate(subject_uuid=Cast('subject_id', UUIDField())) \
         .filter(subject_uuid__in=user_policyholders)
+
+
+class VoucherFormDraftService(BaseService):
+    OBJECT_TYPE = VoucherFormDraft
+
+    def __init__(self, user, validation_class=None):
+        super().__init__(user, validation_class)
+
+    @register_service_signal('voucher_form_draft.create_or_update')
+    def create_or_update(self, obj_data):
+        try:
+            with transaction.atomic():
+                import datetime
+                now = datetime.datetime.now()
+                date_ranges = obj_data.pop('date_ranges') if "date_ranges" in obj_data else []
+                workers = obj_data.pop('workers') if "workers" in obj_data else []
+                type_of_form = obj_data.pop('type_of_form')
+                economic_unit_code = obj_data.pop('economic_unit_code') if "economic_unit_code" in obj_data else None
+                economic_unit = PolicyHolder.objects.get(code=economic_unit_code)
+                draft = self.__get_draft(economic_unit, type_of_form)
+                if draft.count() == 0:
+                    draft = VoucherFormDraft(
+                        **{
+                            "policyholder_id": economic_unit.id,
+                            "user_id": self.user.id,
+                            "type": type_of_form
+                        }
+                    )
+                    draft.save(user=self.user)
+                else:
+                    draft = draft.first()
+                    self.__clear_details(draft)
+                self.__save_date_ranges_to_draft(draft, date_ranges, now)
+                self.__save_workers_to_draft(draft, workers, now)
+        except Exception as exc:
+            return output_exception(
+                model_name=self.OBJECT_TYPE.__name__,
+                method="create_or_update",
+                exception=exc
+            )
+
+    @register_service_signal('voucher_form_draft.delete')
+    def delete(self, economic_unit_code, type_of_form):
+        economic_unit = PolicyHolder.objects.get(code=economic_unit_code)
+        draft = self.__get_draft(economic_unit, type_of_form)
+        if draft.count() == 0:
+            return output_exception(
+                model_name=self.OBJECT_TYPE.__name__,
+                method="delete",
+                exception="Draft does not exist"
+            )
+        else:
+            self.__clear_details(draft.first())
+            draft.delete()
+
+    def __get_draft(self, economic_unit, type_of_form):
+        draft = VoucherFormDraft.objects.filter(
+            policyholder=economic_unit,
+            user=self.user,
+            type=type_of_form
+        )
+        return draft
+
+    def __save_date_ranges_to_draft(self, draft, date_ranges, now):
+        draft_date_ranges = [
+            VoucherFormDraftDateRangesDetails(
+                voucher_form_draft=draft,
+                start_date=date_range['start_date'],
+                end_date=date_range['end_date'],
+                date_created=now,
+                date_updated=now,
+                user_created=self.user,
+                user_updated=self.user,
+                id=uuid.uuid4(),
+            )
+            for date_range in date_ranges
+        ]
+        VoucherFormDraftDateRangesDetails.objects.bulk_create(draft_date_ranges)
+
+    def __save_workers_to_draft(self, draft, workers, now):
+        draft_date_ranges = [
+            VoucherFormDraftWorkersDetails(
+                voucher_form_draft=draft,
+                insuree_id=worker,
+                date_created=now,
+                date_updated=now,
+                user_created=self.user,
+                user_updated=self.user,
+                id=uuid.uuid4(),
+            )
+            for worker in workers
+        ]
+        VoucherFormDraftWorkersDetails.objects.bulk_create(draft_date_ranges)
+
+    def __clear_details(self, draft):
+        VoucherFormDraftDateRangesDetails.objects.filter(voucher_form_draft=draft).delete()
+        VoucherFormDraftWorkersDetails.objects.filter(voucher_form_draft=draft).delete()
