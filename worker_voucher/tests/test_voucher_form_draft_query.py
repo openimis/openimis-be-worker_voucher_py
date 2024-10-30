@@ -59,8 +59,8 @@ class GQLVoucherFormDraftTestCase(TestCase):
         self.assertEqual(query_data['policyholder']['code'], draft.policyholder.code)
         self.assertEqual(query_data['type'], draft.type)
         self.assertEqual(query_data['workers'][0]['chfId'], draft_worker.insuree.chf_id)
-        self.assertEqual(query_data['dateRanges'][0]['startDate'], draft_dates.start_date)
-        self.assertEqual(query_data['dateRanges'][0]['endDate'], draft_dates.end_date)
+        self.assertEqual(query_data['dateRanges'][0]['startDate'], str(draft_dates.start_date))
+        self.assertEqual(query_data['dateRanges'][0]['endDate'], str(draft_dates.end_date))
 
     def test_get_empty_query_draft(self):
         payload = gql_query_voucher_draft_form
