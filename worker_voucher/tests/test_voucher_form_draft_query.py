@@ -47,18 +47,12 @@ class GQLVoucherFormDraftTestCase(TestCase):
         cls.yesterday = datetime.now() - timedelta(days=1)
 
         cls.gql_client = Client(gql_schema)
-        cls.gql_context = cls.GQLContext(None)
+        cls.gql_context = cls.GQLContext(cls.user)
 
     def test_get_existed_draft(self):
         draft, draft_dates, draft_worker = self._create_test_draft()
-        print(draft)
-        print(draft_dates)
-        print(draft_worker)
         payload = gql_query_voucher_draft_form
-        print(payload)
         query_result = self.gql_client.execute(payload, context=self.gql_context)
-        print(query_result['data'])
-        print(query_result['data']['voucherFormDraft'])
         query_data = query_result['data']['voucherFormDraft']['edges'][0]['node']
         self.assertEqual(query_data['uuid'], draft.id)
         self.assertEqual(query_data['user']['username'], draft.user.username)
@@ -72,6 +66,7 @@ class GQLVoucherFormDraftTestCase(TestCase):
         payload = gql_query_voucher_draft_form
         query_result = self.gql_client.execute(payload, context=self.gql_context)
         query_data = query_result['data']['voucherFormDraft']
+        print(query_data)
         self.assertEqual(query_data, None)
 
     def _create_test_draft(self):
