@@ -51,6 +51,9 @@ class GQLVoucherFormDraftTestCase(TestCase):
 
     def test_get_existed_draft(self):
         draft, draft_dates, draft_worker = self._create_test_draft()
+        print(draft)
+        print(draft_dates)
+        print(draft_worker)
         payload = gql_query_voucher_draft_form
         print(payload)
         query_result = self.gql_client.execute(payload, context=self.gql_context)
