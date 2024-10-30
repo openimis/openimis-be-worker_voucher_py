@@ -126,3 +126,13 @@ class GQLVoucherDraftFormUpdateTestCase(TestCase):
         self.assertEquals(draft.type, "ASSIGNMENT")
         self.assertEquals(draft_dates.count(), 2)
         self.assertEquals(draft_workers.count(), 3)
+
+    def _assert_mutation_success(self, mutation_id):
+        mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
+        self.assertEquals(mutation_log.status, 2)
+        self.assertFalse(mutation_log.error)
+
+    def _assert_mutation_failed(self, mutation_id):
+        mutation_log = MutationLog.objects.get(client_mutation_id=mutation_id)
+        self.assertEquals(mutation_log.status, 1)
+        self.assertTrue(mutation_log.error)
