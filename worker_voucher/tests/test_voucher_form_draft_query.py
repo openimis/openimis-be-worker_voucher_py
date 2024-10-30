@@ -54,7 +54,7 @@ class GQLVoucherFormDraftTestCase(TestCase):
         payload = gql_query_voucher_draft_form
         query_result = self.gql_client.execute(payload, context=self.gql_context)
         query_data = query_result['data']['voucherFormDraft']['edges'][0]['node']
-        self.assertEqual(query_data['uuid'], draft.id)
+        self.assertEqual(query_data['uuid'], str(draft.id))
         self.assertEqual(query_data['user']['username'], draft.user.username)
         self.assertEqual(query_data['policyholder']['code'], draft.policyholder.code)
         self.assertEqual(query_data['type'], draft.type)
@@ -65,9 +65,8 @@ class GQLVoucherFormDraftTestCase(TestCase):
     def test_get_empty_query_draft(self):
         payload = gql_query_voucher_draft_form
         query_result = self.gql_client.execute(payload, context=self.gql_context)
-        query_data = query_result['data']['voucherFormDraft']
-        print(query_data)
-        self.assertEqual(query_data, None)
+        query_data = query_result['data']['voucherFormDraft']['edges']
+        self.assertEqual(len(query_data), 0)
 
     def _create_test_draft(self):
         draft = VoucherFormDraft(
