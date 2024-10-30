@@ -107,7 +107,7 @@ def get_draft_voucher_user_filters(user: InteractiveUser) -> Iterable[Q]:
         policyholder__policyholderuser__user__validity_to__isnull=True,
         policyholder__policyholderuser__user__i_user__validity_to__isnull=True,
         user__i_user=user.i_user,
-    )] if not user.has_perms(WorkerVoucherConfig.gql_worker_voucher_assign_vouchers_perms) else []
+    )] if user.has_perms(WorkerVoucherConfig.gql_worker_voucher_assign_vouchers_perms) else []
 
 
 def validate_acquire_unassigned_vouchers(user: User, eu_code: str, count: Union[int, str]) -> Dict:
