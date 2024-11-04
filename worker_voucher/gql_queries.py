@@ -54,6 +54,7 @@ class WorkerVoucherGQLType(DjangoObjectType):
     uuid = graphene.String(source='uuid')
     date_updated_as_date = graphene.String()
     bill_id = graphene.UUID()
+    date_of_assignment = graphene.DateTime()
 
     class Meta:
         model = WorkerVoucher
@@ -65,6 +66,7 @@ class WorkerVoucherGQLType(DjangoObjectType):
             "status": ["exact", "iexact", "istartswith", "icontains"],
             "assigned_date": ["exact", "lt", "lte", "gt", "gte"],
             "expiry_date": ["exact", "lt", "lte", "gt", "gte"],
+            "date_of_assignment": ["exact", "lt", "lte", "gt", "gte"],
 
             **prefix_filterset("insuree__", InsureeGQLType._meta.filter_fields),
             **prefix_filterset("policyholder__", PolicyHolderGQLType._meta.filter_fields),
@@ -85,6 +87,9 @@ class WorkerVoucherGQLType(DjangoObjectType):
                                    is_deleted=False).first()
         if bill:
             return bill.id
+
+    def resolve_date_of_assignment(self, info, **kwargs):
+        return self.date_of_assignment
 
 
 class AcquireVouchersValidationSummaryGQLType(graphene.ObjectType):

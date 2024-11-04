@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q, QuerySet, UUIDField, Count
 from django.db.models.functions import Cast
+from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from core import datetime
@@ -316,6 +317,7 @@ def get_worker_yearly_voucher_count_counts(insuree: Insuree, user: User, year):
 def create_assigned_voucher(user, date, insuree_id, policyholder_id):
     current_date = datetime.datetime.today()
     expiry_date = _get_voucher_expiry_date(current_date)
+    date_of_assignment  = timezone.now()
 
     voucher_service = WorkerVoucherService(user)
     service_result = voucher_service.create({
@@ -323,7 +325,8 @@ def create_assigned_voucher(user, date, insuree_id, policyholder_id):
         "insuree_id": insuree_id,
         "code": str(uuid4()),
         "assigned_date": date,
-        "expiry_date": expiry_date
+        "expiry_date": expiry_date,
+        "date_of_assignment": date_of_assignment
     })
     if service_result.get("success", True):
         return service_result.get("data").get("id")
@@ -339,7 +342,8 @@ def create_unassigned_voucher(user, policyholder_id):
     service_result = voucher_service.create({
         "policyholder_id": policyholder_id,
         "code": str(uuid4()),
-        "expiry_date": expiry_date
+        "expiry_date": expiry_date,
+        "date_of_assignment": None
     })
     if service_result.get("success", False):
         return service_result.get("data").get("id")
@@ -350,10 +354,13 @@ def create_unassigned_voucher(user, policyholder_id):
 def assign_voucher(user, insuree_id, voucher_id, assigned_date):
     # This service function does not check if the voucher is eligible to be assigned
     voucher_service = WorkerVoucherService(user)
+    date_of_assignment = timezone.now()
+
     service_result = voucher_service.update({
         "id": voucher_id,
         "insuree_id": insuree_id,
         "assigned_date": assigned_date,
+        "date_of_assignment": date_of_assignment,
         "status": WorkerVoucher.Status.ASSIGNED
     })
     if service_result.get("success", True):
