@@ -24,7 +24,7 @@ from worker_voucher.gql_mutations import CreateWorkerVoucherMutation, UpdateWork
     DeleteWorkerVoucherMutation, AcquireUnassignedVouchersMutation, AcquireAssignedVouchersMutation, \
     DateRangeInclusiveInputType, AssignVouchersMutation, CreateWorkerMutation, DeleteWorkerMutation, \
     CreateOrUpdateGroupOfWorkerMutation, DeleteGroupOfWorkerMutation, DeleteVoucherDraftFormMutation, \
-    CreateOrUpdateVoucherFormDraftMutation
+    CreateOrUpdateVoucherFormDraftMutation, SetVoucherToPrintedMutation
 from worker_voucher.models import WorkerVoucher, GroupOfWorker, VoucherFormDraft
 from worker_voucher.services import (
     get_voucher_worker_enquire_filters,
@@ -320,6 +320,7 @@ class Mutation(graphene.ObjectType):
     acquire_unassigned_vouchers = AcquireUnassignedVouchersMutation.Field()
     acquire_assigned_vouchers = AcquireAssignedVouchersMutation.Field()
     assign_vouchers = AssignVouchersMutation.Field()
+    set_voucher_to_printed = SetVoucherToPrintedMutation.Field()
 
     create_or_update_group_of_workers = CreateOrUpdateGroupOfWorkerMutation.Field()
     delete_group_of_workers = DeleteGroupOfWorkerMutation.Field()

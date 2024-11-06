@@ -566,3 +566,37 @@ class DeleteVoucherDraftFormMutation(BaseMutation):
             pass
 
         return errors
+
+
+class SetVoucherToPrintedMutation(BaseMutation):
+    _mutation_module = "worker_voucher"
+    _mutation_class = "SetVoucherToPrintedMutation"
+    _model = WorkerVoucher
+
+    class Input(OpenIMISMutation.Input):
+        voucher_id = graphene.ID(required=True, description="ID of the voucher to mark as printed")
+
+    @classmethod
+    def _validate_mutation(cls, user, **data):
+        if not user or not user.has_perms(WorkerVoucherConfig.gql_worker_voucher_assign_vouchers_perms):
+            raise ValidationError("mutation.authentication_required")
+
+    @classmethod
+    def _mutate(cls, user, voucher_id=None, **data):
+        try:
+            with transaction.atomic():
+                try:
+                    voucher = WorkerVoucher.objects.select_for_update().get(uuid=voucher_id)
+                except WorkerVoucher.DoesNotExist:
+                    return [{"message": "worker_voucher.validation.voucher_not_exists"}]
+
+                if voucher.status != WorkerVoucher.Status.UNASSIGNED:
+                    return [{"message": "worker_voucher.validation.not_in_unassigned_status"}]
+
+                voucher.status = WorkerVoucher.Status.PRINTED
+                voucher.save(username=user.username)
+
+        except Exception as exc:
+            return [{"message": "worker_voucher.unexpected_error_occurred", "detail": str(exc)}]
+
+        return None
