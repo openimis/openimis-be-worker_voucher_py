@@ -284,7 +284,7 @@ def check_existing_active_vouchers(ph, insurees, dates):
             is_deleted=False,
             **date_filter
     ).exists():
-        raise VoucherException(_("One or more workers have assigned vouchers in specified ranges"))
+        raise VoucherException("acquirement.validation.existing_active_vouchers")
 
 
 def _check_unassigned_vouchers(ph, dates, count):
@@ -298,7 +298,7 @@ def _check_unassigned_vouchers(ph, dates, count):
         status=WorkerVoucher.Status.UNASSIGNED,
         is_deleted=False).order_by('expiry_date')[:count]
     if unassigned_vouchers.count() < count:
-        raise VoucherException(_(f"Not enough unassigned vouchers"))
+        raise VoucherException("acquirement.validation.not_enough_unassigned_vouchers")
     return unassigned_vouchers
 
 
