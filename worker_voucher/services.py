@@ -22,6 +22,7 @@ from core.services.utils import (
     output_result_success
 )
 from core.signals import register_service_signal
+from graphql import GraphQLError
 from insuree.models import Insuree
 from insuree.gql_mutations import update_or_create_insuree
 from invoice.models import Bill
@@ -44,7 +45,14 @@ logger = logging.getLogger(__name__)
 
 
 class VoucherException(Exception):
-    pass
+    def __init__(self, message, extensions=None):
+        if isinstance(message, dict):
+            self.message = message.get("message", "Unknown error")
+            self.extensions = message.get("extensions", {})
+        else:
+            self.message = message
+            self.extensions = extensions or {}
+        super().__init__(self.message)
 
 
 class WorkerVoucherService(BaseService):
@@ -163,7 +171,10 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
             }
         }
     except VoucherException as e:
-        return {"success": False, "error": str(e)}
+        raise GraphQLError(
+            message=e.message,
+            extensions=e.extensions
+        )
 
 
 def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_ranges: List[Dict]):
@@ -194,8 +205,10 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
             }
         }
     except VoucherException as e:
-        return {"success": False, "error": str(e)}
-
+        raise GraphQLError(
+            message=e.message,
+            extensions=e.extensions
+        )
 
 def _check_ph(user: User, eu_code: str):
     try:
@@ -216,15 +229,19 @@ def _check_insurees(workers: List[str], eu_code: str, user: User):
                 validity_to__isnull=True,
             )
         except Insuree.DoesNotExist:
-            raise VoucherException({
-                "message": "workerVoucher.validation.worker_not_exists",
-                "params": {"code": code}
-            })
+            raise VoucherException(
+                message="workerVoucher.validation.worker_not_exists",
+                extensions={
+                    "params": {"code": code}
+                }
+            )
         if ins in insurees:
-            raise VoucherException({
-                "message": "workerVoucher.validation.worker_duplicated",
-                "params": {"code": code}
-            })
+            raise VoucherException(
+                message= "workerVoucher.validation.worker_duplicated",
+                extensions={
+                    "params": {"code": code}
+                }
+            )
         else:
             insurees.add(ins)
     if not insurees:
@@ -246,33 +263,29 @@ def _check_dates(date_ranges: List[Dict]):
         start_date, end_date = (datetime.date.from_ad_date(date_range.get("start_date")),
                                 datetime.date.from_ad_date(date_range.get("end_date")))
         if start_date < datetime.date.today():
-            raise VoucherException({
-                "message": "workerVoucher.validation.start_date_in_past",
-                "params": {
-                    "start_date": start_date,
-                }})
+            raise VoucherException(
+                message="workerVoucher.validation.start_date_in_past",
+                extensions={"start_date": str(start_date)}
+            )
         if start_date > end_date:
-            raise VoucherException({
-                "message": "workerVoucher.validation.start_date_after_end_date",
-                "params": {
-                    "start_date": start_date,
-                    "end_date": end_date
-                }
-            })
+            raise VoucherException(
+                message="workerVoucher.validation.start_date_after_end_date",
+                extensions={"start_date": str(start_date), "end_date": str(end_date)}
+            )
 
         day_count = (end_date - start_date).days + 1
         for date in (start_date + datetime.datetimedelta(days=n) for n in
                      range(day_count)):
             if date in dates:
-                VoucherException({
-                    "message": "workerVoucher.validation.date_in_more_than_one_range",
-                    "date": date
-                })
+                raise VoucherException(
+                    message="workerVoucher.validation.date_in_more_than_one_range",
+                    extensions={"date": str(date)}
+                )
             if date > max_date:
-                VoucherException({
-                    "message": "workerVoucher.validation.date_after_voucher_expiry_date",
-                    "date": date
-                })
+                raise VoucherException(
+                    message="workerVoucher.validation.date_after_voucher_expiry_date",
+                    extensions={"date": str(date)}
+                )
             else:
                 dates.add(date)
     if not dates:
