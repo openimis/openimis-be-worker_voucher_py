@@ -119,10 +119,10 @@ def validate_acquire_unassigned_vouchers(user: User, eu_code: str, count: Union[
         count = int(count)
         if count < 1:
             return {"success": False,
-                    "error": _("workerVoucher.acquirement.validation.count_greater_than_zero"), }
+                    "error": _("workerVoucher.validation.count_greater_than_zero"), }
         if count > WorkerVoucherConfig.max_generic_vouchers:
             return {"success": False,
-                    "error": _("workerVoucher.acquirement.validation.max_voucher_count_exceeded"), }
+                    "error": _("workerVoucher.validation.max_voucher_count_exceeded"), }
         return {
             "success": True,
             "data": {
@@ -203,7 +203,7 @@ def _check_ph(user: User, eu_code: str):
             economic_unit_user_filter(user, economic_unit_code=eu_code)
         )
     except PolicyHolder.DoesNotExist:
-        raise VoucherException("workerVoucher.acquirement.validation.economic_unit_not_exists")
+        raise VoucherException("workerVoucher.validation.economic_unit_not_exists")
 
 
 def _check_insurees(workers: List[str], eu_code: str, user: User):
@@ -217,18 +217,18 @@ def _check_insurees(workers: List[str], eu_code: str, user: User):
             )
         except Insuree.DoesNotExist:
             raise VoucherException({
-                "message": "workerVoucher.acquirement.validation.worker_not_exists",
+                "message": "workerVoucher.validation.worker_not_exists",
                 "params": {"code": code}
             })
         if ins in insurees:
             raise VoucherException({
-                "message": "workerVoucher.acquirement.validation.worker_duplicated",
+                "message": "workerVoucher.validation.worker_duplicated",
                 "params": {"code": code}
             })
         else:
             insurees.add(ins)
     if not insurees:
-        raise VoucherException("workerVoucher.acquirement.validation.no_valid_workers")
+        raise VoucherException("workerVoucher.validation.no_valid_workers")
     return insurees
 
 
@@ -236,7 +236,7 @@ def _check_voucher_limit(insuree, user, policyholder, year, count=1):
     voucher_counts = get_worker_yearly_voucher_count_counts(insuree, user, year)
 
     if voucher_counts.get(policyholder.code, 0) + count > WorkerVoucherConfig.yearly_worker_voucher_limit:
-        raise VoucherException("workerVoucher.acquirement.validation.yearly_voucher_limit_reached")
+        raise VoucherException("workerVoucher.validation.yearly_voucher_limit_reached")
 
 
 def _check_dates(date_ranges: List[Dict]):
@@ -247,13 +247,13 @@ def _check_dates(date_ranges: List[Dict]):
                                 datetime.date.from_ad_date(date_range.get("end_date")))
         if start_date < datetime.date.today():
             raise VoucherException({
-                "message": "workerVoucher.acquirement.validation.start_date_in_past",
+                "message": "workerVoucher.validation.start_date_in_past",
                 "params": {
                     "start_date": start_date,
                 }})
         if start_date > end_date:
             raise VoucherException({
-                "message": "workerVoucher.acquirement.validation.start_date_after_end_date",
+                "message": "workerVoucher.validation.start_date_after_end_date",
                 "params": {
                     "start_date": start_date,
                     "end_date": end_date
@@ -265,18 +265,18 @@ def _check_dates(date_ranges: List[Dict]):
                      range(day_count)):
             if date in dates:
                 VoucherException({
-                    "message": "workerVoucher.acquirement.validation.date_in_more_than_one_range",
+                    "message": "workerVoucher.validation.date_in_more_than_one_range",
                     "date": date
                 })
             if date > max_date:
                 VoucherException({
-                    "message": "workerVoucher.acquirement.validation.date_after_voucher_expiry_date",
+                    "message": "workerVoucher.validation.date_after_voucher_expiry_date",
                     "date": date
                 })
             else:
                 dates.add(date)
     if not dates:
-        raise VoucherException("workerVoucher.acquirement.validation.validation.no_valid_dates")
+        raise VoucherException("workerVoucher.validation.validation.no_valid_dates")
     return dates
 
 def _get_voucher_expiry_date(start_date: datetime):
@@ -288,7 +288,7 @@ def _get_voucher_expiry_date(start_date: datetime):
         expiry_period = WorkerVoucherConfig.voucher_expiry_period
         expiry_date = datetime.datetime.today() + datetime.datetimedelta(**expiry_period)
     else:
-        raise VoucherException("workerVoucher.acquirement.validation.invalid_expiry_type")
+        raise VoucherException("workerVoucher.validation.invalid_expiry_type")
 
     return expiry_date
 
@@ -306,7 +306,7 @@ def check_existing_active_vouchers(ph, insurees, dates):
             is_deleted=False,
             **date_filter
     ).exists():
-        raise VoucherException("workerVoucher.acquirement.validation.existing_active_vouchers")
+        raise VoucherException("workerVoucher.validation.existing_active_vouchers")
 
 
 def _check_unassigned_vouchers(ph, dates, count):
@@ -320,7 +320,7 @@ def _check_unassigned_vouchers(ph, dates, count):
         status=WorkerVoucher.Status.UNASSIGNED,
         is_deleted=False).order_by('expiry_date')[:count]
     if unassigned_vouchers.count() < count:
-        raise VoucherException("workerVoucher.acquirement.validation.not_enough_unassigned_vouchers")
+        raise VoucherException("workerVoucher.validation.not_enough_unassigned_vouchers")
     return unassigned_vouchers
 
 
@@ -638,7 +638,7 @@ class GroupOfWorkerService(BaseService):
                     group = GroupOfWorker.objects.get(id=group_id)
                     if group.name != obj_data['name']:
                         if GroupOfWorker.objects.filter(name=obj_data['name'], is_deleted=False).count() > 0:
-                            raise VoucherException("workerVoucher.worker_voucher.validation.group_name_already_exists")
+                            raise VoucherException("workerVoucher.validation.group_name_already_exists")
                         [setattr(group, k, v) for k, v in obj_data.items()]
                         group.save(user=self.user)
                     if insurees is not None:
