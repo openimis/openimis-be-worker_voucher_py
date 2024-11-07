@@ -216,9 +216,15 @@ def _check_insurees(workers: List[str], eu_code: str, user: User):
                 validity_to__isnull=True,
             )
         except Insuree.DoesNotExist:
-            raise VoucherException(_(f"Worker {code} does not exists"))
+            raise VoucherException({
+                "message": "workerVoucher.acquirement.validation.worker_not_exists",
+                "params": {"code": code}
+            })
         if ins in insurees:
-            raise VoucherException(_(f"Duplicate worker: {code}"))
+            raise VoucherException({
+                "message": "workerVoucher.acquirement.validation.worker_duplicated",
+                "params": {"code": code}
+            })
         else:
             insurees.add(ins)
     if not insurees:
@@ -240,21 +246,37 @@ def _check_dates(date_ranges: List[Dict]):
         start_date, end_date = (datetime.date.from_ad_date(date_range.get("start_date")),
                                 datetime.date.from_ad_date(date_range.get("end_date")))
         if start_date < datetime.date.today():
-            raise VoucherException("workerVoucher.acquirement.validation.date_in_past")
+            raise VoucherException({
+                "message": "workerVoucher.acquirement.validation.start_date_in_past",
+                "params": {
+                    "start_date": start_date,
+                }})
         if start_date > end_date:
-            raise VoucherException(_(f"Start date {start_date} is after end date {end_date}"))
+            raise VoucherException({
+                "message": "workerVoucher.acquirement.validation.start_date_after_end_date",
+                "params": {
+                    "start_date": start_date,
+                    "end_date": end_date
+                }
+            })
 
         day_count = (end_date - start_date).days + 1
         for date in (start_date + datetime.datetimedelta(days=n) for n in
                      range(day_count)):
             if date in dates:
-                raise VoucherException(_(f"Date {date} in more than one range"))
+                VoucherException({
+                    "message": "workerVoucher.acquirement.validation.date_in_more_than_one_range",
+                    "date": date
+                })
             if date > max_date:
-                raise VoucherException(_(f"Date {date} after voucher expiry date"))
+                VoucherException({
+                    "message": "workerVoucher.acquirement.validation.date_after_voucher_expiry_date",
+                    "date": date
+                })
             else:
                 dates.add(date)
     if not dates:
-        raise VoucherException("workerVoucher.acquirement.validation.no_valid_dates")
+        raise VoucherException("workerVoucher.acquirement.validation.validation.no_valid_dates")
     return dates
 
 def _get_voucher_expiry_date(start_date: datetime):
