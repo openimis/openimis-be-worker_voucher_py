@@ -16,6 +16,7 @@ class WorkerVoucher(HistoryModel):
         EXPIRED = 'EXPIRED', _('Expired')
         CANCELED = 'CANCELED', _('Canceled')
         CLOSED = 'CLOSED', _('Closed')
+        PRINTED = 'PRINTED', _('Printed')
 
     insuree = models.ForeignKey(Insuree, null=True, blank=True, on_delete=models.DO_NOTHING)
     policyholder = models.ForeignKey(PolicyHolder, null=True, blank=True, on_delete=models.DO_NOTHING)
