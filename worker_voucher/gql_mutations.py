@@ -8,6 +8,7 @@ from core import datetime
 from core.gql.gql_mutations.base_mutation import BaseMutation
 from core.models import MutationLog
 from core.schema import OpenIMISMutation
+
 from insuree.apps import InsureeConfig
 from insuree.gql_mutations import CreateInsureeMutation, CreateInsureeInputType
 from insuree.models import Insuree
@@ -383,9 +384,9 @@ class AssignVouchersMutation(BaseMutation):
         data.pop('client_mutation_label', None)
 
         validate_result = validate_assign_vouchers(user, economic_unit_code, workers, date_ranges)
+
         if not validate_result.get("success", False):
             return validate_result
-
         voucher_ids = []
         vouchers = validate_result.get("data").get("unassigned_vouchers")
         with transaction.atomic():

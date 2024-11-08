@@ -22,6 +22,7 @@ from core.services.utils import (
     output_result_success
 )
 from core.signals import register_service_signal
+from graphql import GraphQLError
 from insuree.models import Insuree
 from insuree.gql_mutations import update_or_create_insuree
 from invoice.models import Bill
@@ -44,7 +45,14 @@ logger = logging.getLogger(__name__)
 
 
 class VoucherException(Exception):
-    pass
+    def __init__(self, message, extensions=None):
+        if isinstance(message, dict):
+            self.message = message.get("message", "Unknown error")
+            self.extensions = message.get("extensions", {})
+        else:
+            self.message = message
+            self.extensions = extensions or {}
+        super().__init__(self.message)
 
 
 class WorkerVoucherService(BaseService):
@@ -119,10 +127,10 @@ def validate_acquire_unassigned_vouchers(user: User, eu_code: str, count: Union[
         count = int(count)
         if count < 1:
             return {"success": False,
-                    "error": _("Count have to be greater than 0"), }
+                    "error": _("workerVoucher.validation.count_greater_than_zero"), }
         if count > WorkerVoucherConfig.max_generic_vouchers:
             return {"success": False,
-                    "error": _("Max voucher count exceeded"), }
+                    "error": _("workerVoucher.validation.max_voucher_count_exceeded"), }
         return {
             "success": True,
             "data": {
@@ -163,7 +171,11 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
             }
         }
     except VoucherException as e:
-        return {"success": False, "error": str(e)}
+        return {
+            "success": False,
+            "error": e.message,
+            "extensions": e.extensions
+        }
 
 
 def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_ranges: List[Dict]):
@@ -194,8 +206,11 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
             }
         }
     except VoucherException as e:
-        return {"success": False, "error": str(e)}
-
+        return {
+            "success": False,
+            "error": e.message,
+            "extensions": e.extensions
+        }
 
 def _check_ph(user: User, eu_code: str):
     try:
@@ -203,7 +218,7 @@ def _check_ph(user: User, eu_code: str):
             economic_unit_user_filter(user, economic_unit_code=eu_code)
         )
     except PolicyHolder.DoesNotExist:
-        raise VoucherException(_(f"Economic unit {eu_code} does not exists"))
+        raise VoucherException("workerVoucher.validation.economic_unit_not_exists")
 
 
 def _check_insurees(workers: List[str], eu_code: str, user: User):
@@ -216,13 +231,23 @@ def _check_insurees(workers: List[str], eu_code: str, user: User):
                 validity_to__isnull=True,
             )
         except Insuree.DoesNotExist:
-            raise VoucherException(_(f"Worker {code} does not exists"))
+            raise VoucherException(
+                message="workerVoucher.validation.worker_not_exists",
+                extensions={
+                    "params": {"code": code}
+                }
+            )
         if ins in insurees:
-            raise VoucherException(_(f"Duplicate worker: {code}"))
+            raise VoucherException(
+                message= "workerVoucher.validation.worker_duplicated",
+                extensions={
+                    "params": {"code": code}
+                }
+            )
         else:
             insurees.add(ins)
     if not insurees:
-        raise VoucherException(_("No valid workers"))
+        raise VoucherException("workerVoucher.validation.no_valid_workers")
     return insurees
 
 
@@ -230,7 +255,7 @@ def _check_voucher_limit(insuree, user, policyholder, year, count=1):
     voucher_counts = get_worker_yearly_voucher_count_counts(insuree, user, year)
 
     if voucher_counts.get(policyholder.code, 0) + count > WorkerVoucherConfig.yearly_worker_voucher_limit:
-        raise VoucherException(_(f"Worker {insuree.chf_id} reached yearly voucher limit"))
+        raise VoucherException("workerVoucher.validation.yearly_voucher_limit_reached")
 
 
 def _check_dates(date_ranges: List[Dict]):
@@ -240,21 +265,33 @@ def _check_dates(date_ranges: List[Dict]):
         start_date, end_date = (datetime.date.from_ad_date(date_range.get("start_date")),
                                 datetime.date.from_ad_date(date_range.get("end_date")))
         if start_date < datetime.date.today():
-            raise VoucherException(_(f"Date {start_date} is in the past"))
+            raise VoucherException(
+                message="workerVoucher.validation.start_date_in_past",
+                extensions={"start_date": str(start_date)}
+            )
         if start_date > end_date:
-            raise VoucherException(_(f"Start date {start_date} is after end date {end_date}"))
+            raise VoucherException(
+                message="workerVoucher.validation.start_date_after_end_date",
+                extensions={"start_date": str(start_date), "end_date": str(end_date)}
+            )
 
         day_count = (end_date - start_date).days + 1
         for date in (start_date + datetime.datetimedelta(days=n) for n in
                      range(day_count)):
             if date in dates:
-                raise VoucherException(_(f"Date {date} in more than one range"))
+                raise VoucherException(
+                    message="workerVoucher.validation.date_in_more_than_one_range",
+                    extensions={"date": str(date)}
+                )
             if date > max_date:
-                raise VoucherException(_(f"Date {date} after voucher expiry date"))
+                raise VoucherException(
+                    message="workerVoucher.validation.date_after_voucher_expiry_date",
+                    extensions={"date": str(date)}
+                )
             else:
                 dates.add(date)
     if not dates:
-        raise VoucherException(_(f"No valid dates"))
+        raise VoucherException("workerVoucher.validation.validation.no_valid_dates")
     return dates
 
 def _get_voucher_expiry_date(start_date: datetime):
@@ -266,7 +303,7 @@ def _get_voucher_expiry_date(start_date: datetime):
         expiry_period = WorkerVoucherConfig.voucher_expiry_period
         expiry_date = datetime.datetime.today() + datetime.datetimedelta(**expiry_period)
     else:
-        raise VoucherException(_("Invalid voucher expiry type"))
+        raise VoucherException("workerVoucher.validation.invalid_expiry_type")
 
     return expiry_date
 
@@ -284,7 +321,7 @@ def check_existing_active_vouchers(ph, insurees, dates):
             is_deleted=False,
             **date_filter
     ).exists():
-        raise VoucherException(_("One or more workers have assigned vouchers in specified ranges"))
+        raise VoucherException("workerVoucher.validation.existing_active_vouchers")
 
 
 def _check_unassigned_vouchers(ph, dates, count):
@@ -298,7 +335,7 @@ def _check_unassigned_vouchers(ph, dates, count):
         status=WorkerVoucher.Status.UNASSIGNED,
         is_deleted=False).order_by('expiry_date')[:count]
     if unassigned_vouchers.count() < count:
-        raise VoucherException(_(f"Not enough unassigned vouchers"))
+        raise VoucherException("workerVoucher.validation.not_enough_unassigned_vouchers")
     return unassigned_vouchers
 
 
@@ -616,7 +653,7 @@ class GroupOfWorkerService(BaseService):
                     group = GroupOfWorker.objects.get(id=group_id)
                     if group.name != obj_data['name']:
                         if GroupOfWorker.objects.filter(name=obj_data['name'], is_deleted=False).count() > 0:
-                            raise ValidationError(_("This name for group already exists."))
+                            raise VoucherException("workerVoucher.validation.group_name_already_exists")
                         [setattr(group, k, v) for k, v in obj_data.items()]
                         group.save(user=self.user)
                     if insurees is not None:
@@ -630,7 +667,7 @@ class GroupOfWorkerService(BaseService):
                             worker_group.save(user=self.user)
                 else:
                     if GroupOfWorker.objects.filter(name=obj_data['name'], is_deleted=False).count() > 0:
-                        raise ValidationError(_("This name for group already exists."))
+                        raise ValidationError("workerVoucher.worker_voucher.validation.group_name_already_exists")
                     group = GroupOfWorker(**obj_data)
                     group.save(user=self.user)
                     if insurees:

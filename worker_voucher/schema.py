@@ -11,6 +11,7 @@ from django.contrib.auth.models import AnonymousUser
 from core.gql.export_mixin import ExportableQueryMixin
 from core.schema import OrderedDjangoFilterConnectionField
 from core.utils import append_validity_filter, filter_validity
+from graphql import GraphQLError
 from insuree.apps import InsureeConfig
 from insuree.gql_queries import InsureeGQLType
 from insuree.models import Insuree
@@ -207,7 +208,12 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
             raise AttributeError("worker_voucher.validation.unassigned_voucher_disabled")
         validation_result = validate_assign_vouchers(info.context.user, economic_unit_code, workers, date_ranges)
         if not validation_result.get("success", False):
-            raise AttributeError(validation_result.get("error", _("Unknown Error")))
+            error = validation_result.get("error", _("Unknown Error"))
+            extensions = validation_result.get("extensions", {})
+            raise GraphQLError(
+                message=error,
+                extensions=extensions
+            )
 
         validation_summary = validation_result.get("data")
         validation_summary.pop("policyholder")
