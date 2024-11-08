@@ -173,10 +173,8 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
     except VoucherException as e:
         return {
             "success": False,
-            "error": {
-                "message": e.message,
-                "extensions": e.extensions
-            }
+            "error": e.message,
+            "extensions": e.extensions
         }
 
 
@@ -210,10 +208,8 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
     except VoucherException as e:
         return {
             "success": False,
-            "error": {
-                "message": e.message,
-                "extensions": e.extensions
-            }
+            "error": e.message,
+            "extensions": e.extensions
         }
 
 def _check_ph(user: User, eu_code: str):
