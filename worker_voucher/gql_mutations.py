@@ -340,8 +340,14 @@ class AcquireAssignedVouchersMutation(BaseMutation):
 
         validate_result = validate_acquire_assigned_vouchers(user, economic_unit_code, workers, date_ranges)
         if not validate_result.get("success", False):
-            return validate_result
+            error_message = validate_result["error"]["message"]
+            error_extensions = validate_result["error"].get("extensions", {})
 
+            return GraphQLError(
+                message=error_message,
+                extensions=error_extensions
+            )
+        
         policyholder_id = validate_result.get("data").get("policyholder").id
         voucher_ids = []
         with transaction.atomic():
@@ -390,9 +396,15 @@ class AssignVouchersMutation(BaseMutation):
         data.pop('client_mutation_label', None)
 
         validate_result = validate_assign_vouchers(user, economic_unit_code, workers, date_ranges)
-        if not validate_result.get("success", False):
-            return validate_result
 
+        if not validate_result.get("success", False):
+            error_message = validate_result["error"]["message"]
+            error_extensions = validate_result["error"].get("extensions", {})
+
+            return GraphQLError(
+                message=error_message,
+                extensions=error_extensions
+            )
         voucher_ids = []
         vouchers = validate_result.get("data").get("unassigned_vouchers")
         with transaction.atomic():
