@@ -171,10 +171,13 @@ def validate_acquire_assigned_vouchers(user: User, eu_code: str, workers: List[s
             }
         }
     except VoucherException as e:
-        raise GraphQLError(
-            message=e.message,
-            extensions=e.extensions
-        )
+        return {
+            "success": False,
+            "error": {
+                "message": e.message,
+                "extensions": e.extensions
+            }
+        }
 
 
 def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_ranges: List[Dict]):
@@ -205,10 +208,13 @@ def validate_assign_vouchers(user: User, eu_code: str, workers: List[str], date_
             }
         }
     except VoucherException as e:
-        raise GraphQLError(
-            message=e.message,
-            extensions=e.extensions
-        )
+        return {
+            "success": False,
+            "error": {
+                "message": e.message,
+                "extensions": e.extensions
+            }
+        }
 
 def _check_ph(user: User, eu_code: str):
     try:

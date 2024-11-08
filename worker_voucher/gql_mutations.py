@@ -8,6 +8,7 @@ from core import datetime
 from core.gql.gql_mutations.base_mutation import BaseMutation
 from core.models import MutationLog
 from core.schema import OpenIMISMutation
+from graphql import GraphQLError
 from insuree.apps import InsureeConfig
 from insuree.gql_mutations import CreateInsureeMutation, CreateInsureeInputType
 from insuree.models import Insuree
@@ -274,7 +275,13 @@ class AcquireUnassignedVouchersMutation(BaseMutation):
 
         validate_result = validate_acquire_unassigned_vouchers(user, economic_unit_code, count)
         if not validate_result.get("success", False):
-            return validate_result
+            error_message = validate_result["error"]["message"]
+            error_extensions = validate_result["error"].get("extensions", {})
+
+            return GraphQLError(
+                message=error_message,
+                extensions=error_extensions
+            )
 
         policyholder_id = validate_result.get("data").get("policyholder").id
         voucher_ids = []
