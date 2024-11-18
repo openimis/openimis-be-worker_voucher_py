@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+import os
 
 from core.utils import ConfigUtilMixin
 
@@ -17,7 +18,7 @@ DEFAULT_CONFIG = {
     "gql_group_of_worker_delete_perms": ["206004"],
     "gql_group_of_worker_search_all_perms": ["206005"],
     "unassigned_voucher_enabled": True,
-    "price_per_voucher": "100.00",
+    "price_per_voucher": os.getenv("PRICE_PER_VOUCHER", "50.00"),
     "max_generic_vouchers": 1000,
     #  This fileds should be a valid datetimedelata input
     "voucher_bill_due_period": {
