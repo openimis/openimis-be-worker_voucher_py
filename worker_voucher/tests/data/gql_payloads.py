@@ -160,6 +160,8 @@ query voucherCheck{
     assignedDate
     employerCode
     employerName
+    nameFirstLetter
+    lastName
   }
 }
 """

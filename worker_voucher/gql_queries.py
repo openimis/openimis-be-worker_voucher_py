@@ -146,6 +146,8 @@ class VoucherCheckGQLType(graphene.ObjectType):
     assigned_date = graphene.DateTime()
     employer_code = graphene.String()
     employer_name = graphene.String()
+    last_name = graphene.String()
+    name_first_letter = graphene.String()
 
 
 class DateRangeType(graphene.ObjectType):

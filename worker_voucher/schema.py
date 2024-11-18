@@ -267,7 +267,7 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
                 policyholder__is_deleted=False,
                 is_deleted=False,
                 expiry_date__gte=today,
-                status=WorkerVoucher.Status.ASSIGNED
+                status=WorkerVoucher.Status.ASSIGNED,
             ).first()
             if not voucher:
                 return VoucherCheckGQLType(
@@ -276,6 +276,8 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
                     assigned_date=None,
                     employer_code=None,
                     employer_name=None,
+                    name_first_letter=None,
+                    last_name=None,
                 )
             if voucher.assigned_date.date() >= today.date():
                 return VoucherCheckGQLType(
@@ -283,7 +285,9 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
                     is_valid=True,
                     assigned_date=voucher.assigned_date,
                     employer_code=voucher.policyholder.code,
-                    employer_name=voucher.policyholder.trade_name
+                    employer_name=voucher.policyholder.trade_name,
+                    name_first_letter=voucher.insuree.other_names[0],
+                    last_name=voucher.insuree.last_name,
                 )
             else:
                 return VoucherCheckGQLType(
@@ -291,7 +295,9 @@ class Query(ExportableQueryMixin, graphene.ObjectType):
                     is_valid=False,
                     assigned_date=voucher.assigned_date,
                     employer_code=voucher.policyholder.code,
-                    employer_name=voucher.policyholder.trade_name
+                    employer_name=voucher.policyholder.trade_name,
+                    name_first_letter=voucher.insuree.other_names[0],
+                    last_name=voucher.insuree.last_name,
                 )
         except Exception:
             raise ValidationError(_("Unable to fetch voucher details"))

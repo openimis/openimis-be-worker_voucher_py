@@ -58,6 +58,8 @@ class GQLVoucherCheckTestCase(TestCase):
         self.assertEqual(assigned_date, voucher.assigned_date.date())
         self.assertEqual(query_data['employerCode'], voucher.policyholder.code)
         self.assertEqual(query_data['employerName'], voucher.policyholder.trade_name)
+        self.assertEqual(query_data['lastName'], voucher.insuree.last_name)
+        self.assertEqual(query_data['nameFirstLetter'], voucher.insuree.other_names[0])
 
     def test_get_existed_voucher_from_tomorrow_by_code(self):
         voucher = self._create_test_voucher(assigned_date=self.tomorrow)
@@ -72,6 +74,8 @@ class GQLVoucherCheckTestCase(TestCase):
         self.assertEqual(assigned_date, voucher.assigned_date.date())
         self.assertEqual(query_data['employerCode'], voucher.policyholder.code)
         self.assertEqual(query_data['employerName'], voucher.policyholder.trade_name)
+        self.assertEqual(query_data['lastName'], voucher.insuree.last_name)
+        self.assertEqual(query_data['nameFirstLetter'], voucher.insuree.other_names[0])
 
     def test_get_not_existed_voucher_by_code(self):
         payload = gql_query_voucher_check % (
@@ -84,6 +88,8 @@ class GQLVoucherCheckTestCase(TestCase):
         self.assertEqual(query_data['assignedDate'], None)
         self.assertEqual(query_data['employerCode'], None)
         self.assertEqual(query_data['employerName'], None)
+        self.assertEqual(query_data['lastName'], None)
+        self.assertEqual(query_data['nameFirstLetter'], None)
 
     def test_get_existed_voucher_from_yesterday_by_code(self):
         voucher = self._create_test_voucher(assigned_date=self.yesterday)
@@ -98,6 +104,8 @@ class GQLVoucherCheckTestCase(TestCase):
         self.assertEqual(assigned_date, voucher.assigned_date.date())
         self.assertEqual(query_data['employerCode'], voucher.policyholder.code)
         self.assertEqual(query_data['employerName'], voucher.policyholder.trade_name)
+        self.assertEqual(query_data['lastName'], voucher.insuree.last_name)
+        self.assertEqual(query_data['nameFirstLetter'], voucher.insuree.other_names[0])
 
     def _create_test_voucher(self, code="001", status=WorkerVoucher.Status.ASSIGNED, assigned_date=None,
                              expiry_date=None):
