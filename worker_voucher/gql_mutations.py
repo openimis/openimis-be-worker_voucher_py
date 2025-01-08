@@ -8,6 +8,7 @@ from core import datetime
 from core.gql.gql_mutations.base_mutation import BaseMutation
 from core.models import MutationLog
 from core.schema import OpenIMISMutation
+
 from insuree.apps import InsureeConfig
 from insuree.gql_mutations import CreateInsureeMutation, CreateInsureeInputType
 from insuree.models import Insuree
@@ -383,9 +384,9 @@ class AssignVouchersMutation(BaseMutation):
         data.pop('client_mutation_label', None)
 
         validate_result = validate_assign_vouchers(user, economic_unit_code, workers, date_ranges)
+
         if not validate_result.get("success", False):
             return validate_result
-
         voucher_ids = []
         vouchers = validate_result.get("data").get("unassigned_vouchers")
         with transaction.atomic():
@@ -566,3 +567,37 @@ class DeleteVoucherDraftFormMutation(BaseMutation):
             pass
 
         return errors
+
+
+class SetVoucherToPrintedMutation(BaseMutation):
+    _mutation_module = "worker_voucher"
+    _mutation_class = "SetVoucherToPrintedMutation"
+    _model = WorkerVoucher
+
+    class Input(OpenIMISMutation.Input):
+        voucher_id = graphene.ID(required=True, description="ID of the voucher to mark as printed")
+
+    @classmethod
+    def _validate_mutation(cls, user, **data):
+        if not user or not user.has_perms(WorkerVoucherConfig.gql_worker_voucher_assign_vouchers_perms):
+            raise ValidationError("mutation.authentication_required")
+
+    @classmethod
+    def _mutate(cls, user, voucher_id=None, **data):
+        try:
+            with transaction.atomic():
+                try:
+                    voucher = WorkerVoucher.objects.select_for_update().get(uuid=voucher_id)
+                except WorkerVoucher.DoesNotExist:
+                    return [{"message": "worker_voucher.validation.voucher_not_exists"}]
+
+                if voucher.status != WorkerVoucher.Status.UNASSIGNED:
+                    return [{"message": "worker_voucher.validation.not_in_unassigned_status"}]
+
+                voucher.status = WorkerVoucher.Status.PRINTED
+                voucher.save(username=user.username)
+
+        except Exception as exc:
+            return [{"message": "worker_voucher.unexpected_error_occurred", "detail": str(exc)}]
+
+        return None

@@ -16,6 +16,7 @@ class WorkerVoucher(HistoryModel):
         EXPIRED = 'EXPIRED', _('Expired')
         CANCELED = 'CANCELED', _('Canceled')
         CLOSED = 'CLOSED', _('Closed')
+        PRINTED = 'PRINTED', _('Printed')
 
     insuree = models.ForeignKey(Insuree, null=True, blank=True, on_delete=models.DO_NOTHING)
     policyholder = models.ForeignKey(PolicyHolder, null=True, blank=True, on_delete=models.DO_NOTHING)
@@ -24,6 +25,7 @@ class WorkerVoucher(HistoryModel):
                               default=Status.AWAITING_PAYMENT)
     assigned_date = fields.DateTimeField(blank=True, null=True)
     expiry_date = fields.DateTimeField(blank=True, null=True)
+    date_of_assignment = fields.DateTimeField(blank=True, null=True)
 
     @classmethod
     def get_queryset(cls, queryset, user):
